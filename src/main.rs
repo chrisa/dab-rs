@@ -5,13 +5,14 @@
 mod wavefinder;
 use wavefinder::Wavefinder;
 
-fn cb(_buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int
+fn cb(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int
 {
-    // println!("{:?}", buf);
+    println!("in rust cb: {:?}", buf);
     0
 }
 
 fn main() {
     let w: Wavefinder = wavefinder::open(cb);
-    println!("{:?}", w);
+    w.init(225.648);
+    w.read();
 }

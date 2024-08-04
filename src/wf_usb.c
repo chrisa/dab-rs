@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 
 static void cb_xfr(struct libusb_transfer *xfr)
 {
@@ -93,6 +94,27 @@ void wf_close(struct wf_device *wf)
         libusb_exit(NULL);
 }
 
+void wf_read(struct wf_device *wf)
+{
+        int rc;
+
+        wf->xfr->user_data = wf;
+
+        rc = libusb_submit_transfer(wf->xfr);
+        if (rc != LIBUSB_SUCCESS) {
+                fprintf(stderr, "libusb_submit_transfer: %s\n", libusb_error_name(rc));
+                exit(EXIT_FAILURE);
+        }
+
+        for (;;) {
+                rc = libusb_handle_events(NULL);
+                if (rc != LIBUSB_SUCCESS) {
+                        fprintf(stderr, "libusb_handle_events: %s\n", libusb_error_name(rc));
+                        exit(EXIT_FAILURE);
+                }
+        }
+}
+
 static void cb_ctrl_xfr(struct libusb_transfer *ctrl_xfr)
 {
         if (ctrl_xfr->status != LIBUSB_TRANSFER_COMPLETED) {
@@ -103,7 +125,19 @@ static void cb_ctrl_xfr(struct libusb_transfer *ctrl_xfr)
         libusb_free_transfer(ctrl_xfr);
 }
 
-int wf_usb_ctrl_msg(struct wf_device *wf, struct wf_ctrl_request *req)
+struct wf_ctrl_request *wf_ctrl_request_init(uint32_t request, uint32_t value, uint32_t index, unsigned char *bytes, size_t size, bool async)
+{
+        struct wf_ctrl_request *req = malloc(sizeof(struct wf_ctrl_request));
+        req->request = request;
+        req->value = value;
+        req->index = index;
+        req->bytes = bytes;
+        req->size = size;
+        req->async = async;
+        return req;
+}
+
+size_t wf_usb_ctrl_msg(struct wf_device *wf, struct wf_ctrl_request *req)
 {
         if (req->async) {
                 struct libusb_transfer *ctrl_xfr = libusb_alloc_transfer(0);
@@ -133,7 +167,8 @@ int wf_usb_ctrl_msg(struct wf_device *wf, struct wf_ctrl_request *req)
                                              cb_ctrl_xfr,
                                              wf,
                                              0);
-
+                
+                free(req);
                 int rc = libusb_submit_transfer(ctrl_xfr);
                 if (rc != LIBUSB_SUCCESS) {
                         fprintf(stderr, "libusb_submit_transfer, ctrl, async: %s\n", libusb_error_name(rc));
@@ -149,6 +184,7 @@ int wf_usb_ctrl_msg(struct wf_device *wf, struct wf_ctrl_request *req)
                                              req->bytes,
                                              req->size,
                                              0);
+                free(req);
                 if (rc < 0) {
                         fprintf(stderr, "libusb_control_transfer: %s\n", libusb_error_name(rc));
                         exit(EXIT_FAILURE);

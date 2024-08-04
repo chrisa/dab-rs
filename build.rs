@@ -4,6 +4,7 @@ use std::path::PathBuf;
 fn main() {
 
     cc::Build::new()
+        .flag("-std=c99")
         .file("src/wf_usb.c")
         .compile("wf_usb");
 
