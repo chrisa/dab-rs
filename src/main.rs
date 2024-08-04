@@ -2,29 +2,16 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
-#[allow(clippy::all)]
-mod bindings {
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
+mod wavefinder;
+use wavefinder::Wavefinder;
+
+fn cb(_buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int
+{
+    // println!("{:?}", buf);
+    0
 }
 
-pub use bindings::*;
-
 fn main() {
-
-    let callback: process_func = Some({
-        unsafe extern "C"
-        fn cb (w: *mut wavefinder, buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int
-        {
-            println!("{:?}", w);
-            println!("{:?}", buf);
-            0
-        }
-        cb
-    });
-
-
-    // let callback = Some(cb);
-    let w: &mut wavefinder = unsafe { &mut *wf_open(callback) };
+    let w: Wavefinder = wavefinder::open(cb);
     println!("{:?}", w);
-    unsafe { wf_close(w) };
 }

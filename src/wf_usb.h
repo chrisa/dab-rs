@@ -6,14 +6,15 @@
 #define WF_VENDOR 0x9cd
 #define WF_PRODUCT 0x2001
 
-typedef struct wavefinder {
-        int (*process_func)(struct wavefinder *, unsigned char *);
+typedef struct wf_device {
+        int (*process_func)(struct wf_device *, unsigned char *);
         struct libusb_device_handle *devh;
         struct libusb_transfer *xfr;
         struct libusb_transfer *ctrl_xfr;
         unsigned char buf[WF_PIPESIZE];
         unsigned char *bufptr;
-} wf;
+        size_t callback;
+} device;
 
 typedef struct wf_ctrl_request {
     int request;
@@ -24,7 +25,8 @@ typedef struct wf_ctrl_request {
     int async;
 } ctrl_req;
 
-typedef int (*process_func)(struct wavefinder *, unsigned char *);
+typedef int (*process_func)(struct wf_device *, unsigned char *);
 
-struct wavefinder *wf_open(process_func func);
-void wf_close(struct wavefinder *);
+struct wf_device *wf_open(process_func func, size_t callback);
+void wf_close(struct wf_device *);
+size_t wf_callback(struct wf_device *);

@@ -6,7 +6,7 @@
 static void cb_xfr(struct libusb_transfer *xfr)
 {
         int i;
-        struct wavefinder *wf = xfr->user_data;
+        struct wf_device *wf = xfr->user_data;
         struct timeval t;
 
         if (xfr->status != LIBUSB_TRANSFER_COMPLETED) {
@@ -37,10 +37,10 @@ static void cb_xfr(struct libusb_transfer *xfr)
         }
 }
 
-struct wavefinder *wf_open(process_func func)
+struct wf_device *wf_open(process_func func, size_t callback)
 {
         int rc;
-        struct wavefinder *wf = NULL;
+        struct wf_device *wf = NULL;
         struct libusb_device_handle *devh = NULL;
 
         rc = libusb_init(NULL);
@@ -62,12 +62,13 @@ struct wavefinder *wf_open(process_func func)
                 return NULL;
         }
 
-        if ((wf = malloc(sizeof (struct wavefinder))) == NULL)
+        if ((wf = malloc(sizeof (struct wf_device))) == NULL)
                 return NULL;
 
         wf->devh = devh;
         wf->bufptr = wf->buf;
         wf->process_func = func;
+        wf->callback = callback;
 
         wf->xfr = libusb_alloc_transfer(32);
         if (!wf->xfr)
@@ -80,7 +81,12 @@ struct wavefinder *wf_open(process_func func)
         return wf;
 }
 
-void wf_close(struct wavefinder *wf)
+size_t wf_callback(struct wf_device * wf)
+{
+        return wf->callback;
+}
+
+void wf_close(struct wf_device *wf)
 {
         libusb_release_interface(wf->devh, 0);
         libusb_close(wf->devh);
@@ -97,7 +103,7 @@ static void cb_ctrl_xfr(struct libusb_transfer *ctrl_xfr)
         libusb_free_transfer(ctrl_xfr);
 }
 
-int wf_usb_ctrl_msg(struct wavefinder *wf, struct wf_ctrl_request *req)
+int wf_usb_ctrl_msg(struct wf_device *wf, struct wf_ctrl_request *req)
 {
         if (req->async) {
                 struct libusb_transfer *ctrl_xfr = libusb_alloc_transfer(0);
