@@ -102,12 +102,6 @@ impl Wavefinder {
 
     fn sendmem(&self, value: u32, index: u32, buffer: &mut Vec<u8>) -> usize
     {
-        // println!("{:?}", buffer);
-        // for b in buffer.clone() {
-        //     print!("{:#04x} ", b);
-        // }
-        // println!("");
-
         unsafe {
             let req: *mut wf_ctrl_request = wf_ctrl_request_init(WF_REQ_SLMEM, value, index, buffer.as_mut_ptr(), buffer.len(), false);
             wf_usb_ctrl_msg(self.device, req)
@@ -116,20 +110,16 @@ impl Wavefinder {
 
     fn r2_msg(&self, buffer: &mut[u8]) -> usize
     {
-	    // usb_ctrl_msg(wf, 2, 0, 0x80, bytes, 64))
         unsafe {
             let req: *mut wf_ctrl_request = wf_ctrl_request_init(2, 0, 0x80, buffer.as_mut_ptr(), buffer.len(), false);
-            println!("{:?}", req);
             wf_usb_ctrl_msg(self.device, req)
         }
     }
 
     fn r1_msg(&self, buffer: &mut[u8]) -> usize
     {
-	    // return(wf_usb_ctrl_msg(wf, 1, 0, 0x80, bytes, 64));
         unsafe {
             let req: *mut wf_ctrl_request = wf_ctrl_request_init(1, 0, 0x80, buffer.as_mut_ptr(), buffer.len(), false);
-            println!("{:?}", req);
             wf_usb_ctrl_msg(self.device, req)
         }
     }

@@ -234,8 +234,6 @@ impl Wavefinder {
         self.tune(freq);
         self.sleep(200);
         self.mem_write(DACVALUE, 0x5330);
-    
-        println!("exited init");
     }
 
 }
