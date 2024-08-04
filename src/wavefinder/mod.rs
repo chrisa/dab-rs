@@ -53,14 +53,14 @@ impl Wavefinder {
         }
     }
 
-    fn mem_write(&self, addr: u32, val: u16) -> usize
+    fn mem_write(&self, addr: u16, val: u16) -> usize
     {
         let addr_bytes = addr.to_be_bytes();
         let val_bytes = val.to_be_bytes();
 
     	let mut bytes = vec!(
-            addr_bytes[3],
-            addr_bytes[2],
+            addr_bytes[1],
+            addr_bytes[0],
             val_bytes[1],
             val_bytes[0],
         );
@@ -78,7 +78,7 @@ impl Wavefinder {
             reg_bytes[3], 
             bits,
             0x00,
-            pll.into(),
+            pll,
             0x00,
             lband.into(),
             0x00,

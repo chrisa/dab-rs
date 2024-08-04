@@ -1,8 +1,6 @@
 #include <libusb-1.0/libusb.h>
 #include <stdbool.h>
 
-#include "wfsl11r.h"
-
 #define WF_PIPESIZE 16768
 #define WF_IF 0
 #define WF_ISOPIPE 0x81

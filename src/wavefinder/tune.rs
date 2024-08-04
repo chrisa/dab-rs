@@ -54,10 +54,7 @@ fn reverse_bits(op: u32, len: usize) -> u32
 impl Wavefinder {
 
     pub fn tune(&self, freq: f64)
-    {
-        let f_vco: u32;
-        let f_vcod: f64;
-    
+    {    
         let lband;
         let offset_freq;
 
@@ -86,8 +83,8 @@ impl Wavefinder {
         self.tune_msg(rc, 22, LMX2331A, lband);
 
         /* Load the N counter of the Band III PLL - this does the tuning */
-        f_vcod = (offset_freq * 1e6 + IF)/(F_OSC / R_1511);
-        f_vco = f_vcod.ceil() as u32; /* TODO: Necessary ?  Seems to be *essential* */
+        let f_vcod = (offset_freq * 1e6 + IF)/(F_OSC / R_1511);
+        let f_vco = f_vcod.ceil() as u32; /* TODO: Necessary ?  Seems to be *essential* */
 
         /* Load the IF N counter of the Band L PLL - constants */
         rc = 0x200000 | reverse_bits(NIFA_2331A, 7) << 13 | reverse_bits(NIFB_2331A, 11) << 2 | 2;
