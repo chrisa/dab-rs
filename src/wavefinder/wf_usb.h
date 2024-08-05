@@ -12,14 +12,13 @@
 #define WF_REQ_TIMING 5
 
 typedef struct wf_device {
-        void (*process_func)(struct wf_device *, unsigned char *);
-        struct libusb_device_handle *devh;
-        struct libusb_transfer *xfr;
-        struct libusb_transfer *ctrl_xfr;
-        unsigned char buf[WF_PIPESIZE];
-        unsigned char *bufptr;
-        size_t callback;
-        // size_t context;
+    struct libusb_device_handle *devh;
+    struct libusb_transfer *xfr;
+    struct libusb_transfer *ctrl_xfr;
+    unsigned char buf[WF_PIPESIZE];
+    unsigned char *bufptr;
+    void (*callback)(struct wf_device *, void *, unsigned char *);
+    void *data;
 } device;
 
 typedef struct wf_ctrl_request {
@@ -31,9 +30,9 @@ typedef struct wf_ctrl_request {
     int async;
 } ctrl_req;
 
-typedef void (*process_func)(struct wf_device *, unsigned char *);
+typedef void (*process_func)(struct wf_device *, void *, unsigned char *);
 
-struct wf_device *wf_open(process_func func, size_t callback);
+struct wf_device *wf_open(process_func, void *);
 void wf_close(struct wf_device *);
 size_t wf_callback(struct wf_device *);
 size_t wf_context(struct wf_device *);

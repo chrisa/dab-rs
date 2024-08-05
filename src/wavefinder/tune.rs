@@ -41,7 +41,7 @@ fn reverse_bits(op: u32, len: usize) -> u32 {
     let mut j: u32 = 0;
 
     while i < len {
-        if op & (1 << (len - i - 1)) == 1 {
+        if op & (1 << (len - i - 1)) != 0 {
             j |= 1 << i;
         }
         i += 1;

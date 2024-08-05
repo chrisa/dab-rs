@@ -27,7 +27,7 @@ static void cb_xfr(struct libusb_transfer *xfr)
                         exit(5);
                 }
 
-                (wf->process_func)(wf, buf);
+                (wf->callback)(wf, wf->data, buf);
         }
 
         xfr->user_data = wf;
@@ -38,7 +38,7 @@ static void cb_xfr(struct libusb_transfer *xfr)
         }
 }
 
-struct wf_device *wf_open(process_func func, size_t callback)
+struct wf_device *wf_open(process_func callback, void *data)
 {
         int rc;
         struct wf_device *wf = NULL;
@@ -68,9 +68,8 @@ struct wf_device *wf_open(process_func func, size_t callback)
 
         wf->devh = devh;
         wf->bufptr = wf->buf;
-        wf->process_func = func;
         wf->callback = callback;
-        // wf->context = context;
+        wf->data = data;
 
         wf->xfr = libusb_alloc_transfer(32);
         if (!wf->xfr)
@@ -81,11 +80,6 @@ struct wf_device *wf_open(process_func func, size_t callback)
         libusb_set_iso_packet_lengths(wf->xfr, 524);
 
         return wf;
-}
-
-size_t wf_callback(struct wf_device * wf)
-{
-        return wf->callback;
 }
 
 void wf_close(struct wf_device *wf)
