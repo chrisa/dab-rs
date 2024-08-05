@@ -5,8 +5,7 @@
 mod wavefinder;
 use wavefinder::Wavefinder;
 
-fn cb(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int
-{
+fn cb(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int {
     println!("in rust cb: {:?}", buf);
     0
 }

@@ -2,10 +2,9 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-
     cc::Build::new()
         .flag("-std=c99")
-        .file("src/wf_usb.c")
+        .file("src/wavefinder/wf_usb.c")
         .compile("wf_usb");
 
     // Tell cargo to look for shared libraries in the specified directory
@@ -21,7 +20,7 @@ fn main() {
     let bindings = bindgen::Builder::default()
         // The input header we would like to generate
         // bindings for.
-        .header("src/wf_usb.h")
+        .header("src/wavefinder/wf_usb.h")
         // Tell cargo to invalidate the built crate whenever any of the
         // included header files changed.
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

@@ -30,39 +30,35 @@ const NRFA_2331A: u32 = 98;
 const NRFB_2331A: u32 = 152;
 
 /* PLL Selection */
-const LMX1511:  u8 = 1;
+const LMX1511: u8 = 1;
 const LMX2331A: u8 = 0;
 
 /*
 ** Reverse the 'len' least sig bits in 'op'
-*/ 
-fn reverse_bits(op: u32, len: usize) -> u32
-{
-	let mut i: usize = 0;
-	let mut j: u32 = 0;
+*/
+fn reverse_bits(op: u32, len: usize) -> u32 {
+    let mut i: usize = 0;
+    let mut j: u32 = 0;
 
-	while i < len {
-		if op & (1 << (len - i - 1)) == 1 {
-			j |= 1 << i;
+    while i < len {
+        if op & (1 << (len - i - 1)) == 1 {
+            j |= 1 << i;
         }
         i += 1;
-    };
+    }
 
     j
 }
 
 impl Wavefinder {
-
-    pub fn tune(&self, freq: f64)
-    {    
+    pub fn tune(&self, freq: f64) {
         let lband;
         let offset_freq;
 
         if freq > MAXFREQIII {
             lband = true;
             offset_freq = freq - LBANDOFFSET;
-        }
-        else {
+        } else {
             lband = false;
             offset_freq = freq;
         }
@@ -78,12 +74,12 @@ impl Wavefinder {
         rc = 0x300000 | reverse_bits(NRFA_2331A, 7) << 13 | reverse_bits(NRFB_2331A, 11) << 2 | 2;
         self.tune_msg(rc, 22, LMX2331A, lband);
 
-        /* Load the IF R counter of the Band L PLL - constants */ 
+        /* Load the IF R counter of the Band L PLL - constants */
         rc = reverse_bits(R_2331A, 15) << 5 | 0x10;
         self.tune_msg(rc, 22, LMX2331A, lband);
 
         /* Load the N counter of the Band III PLL - this does the tuning */
-        let f_vcod = (offset_freq * 1e6 + IF)/(F_OSC / R_1511);
+        let f_vcod = (offset_freq * 1e6 + IF) / (F_OSC / R_1511);
         let f_vco = f_vcod.ceil() as u32; /* TODO: Necessary ?  Seems to be *essential* */
 
         /* Load the IF N counter of the Band L PLL - constants */
@@ -92,14 +88,13 @@ impl Wavefinder {
 
         let b_1511 = f_vco / P_1511;
         let a_1511 = f_vco % P_1511;
-    
+
         /* Load the R counter and S latch of the Band III PLL - constants */
         rc = 0x8000 | (reverse_bits(R_1511 as u32, 14)) << 1 | 1;
         self.tune_msg(rc, 16, LMX1511, lband);
 
         /* Load the N counter (as A and B counters) of the Band III PLL */
-        rc = reverse_bits(a_1511,7) << 11 | reverse_bits(b_1511,11);
+        rc = reverse_bits(a_1511, 7) << 11 | reverse_bits(b_1511, 11);
         self.tune_msg(rc, 19, LMX1511, lband);
     }
-
 }
