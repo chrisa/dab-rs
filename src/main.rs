@@ -3,14 +3,20 @@
 #![allow(non_snake_case)]
 
 mod wavefinder;
-use wavefinder::Wavefinder;
+use wavefinder::{Buffer, CallbackContext, Wavefinder};
 
-fn cb(buf: *mut ::std::os::raw::c_uchar) -> ::std::os::raw::c_int {
-    println!("in rust cb: {:?}", buf);
-    0
+mod prs;
+
+fn cb(buffer: Buffer) {
+    println!("in rust cb: {:?}", buffer);
+    // let mut prs = ctx.prs;
+    // prs.try_buffer(buffer);
 }
 
 fn main() {
+    let prs = prs::new();
+
+    let ctx = CallbackContext { prs: prs };
     let w: Wavefinder = wavefinder::open(cb);
     w.init(225.648);
     w.read();

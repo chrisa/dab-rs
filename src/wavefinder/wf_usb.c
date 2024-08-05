@@ -70,6 +70,7 @@ struct wf_device *wf_open(process_func func, size_t callback)
         wf->bufptr = wf->buf;
         wf->process_func = func;
         wf->callback = callback;
+        // wf->context = context;
 
         wf->xfr = libusb_alloc_transfer(32);
         if (!wf->xfr)
