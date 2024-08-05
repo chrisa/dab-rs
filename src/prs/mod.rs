@@ -1,4 +1,6 @@
 use crate::wavefinder::Buffer;
+use rustfft::num_complex::{c64, Complex64};
+use std::collections::HashSet;
 use std::convert::TryFrom;
 
 #[derive(Debug)]
@@ -36,30 +38,47 @@ impl PhaseReferenceBuffer {
 }
 
 pub struct PhaseReferenceSymbol {
-    block_seen: u8,
+    blocks_seen: HashSet<u8>,
     bytes: [u8; 2048],
 }
 
 pub fn new() -> PhaseReferenceSymbol {
     PhaseReferenceSymbol {
-        block_seen: 255,
+        blocks_seen: Default::default(),
         bytes: [0; 2048],
     }
 }
 
 impl PhaseReferenceSymbol {
     pub fn try_buffer(&mut self, buffer: Buffer) {
+        if self.complete() {
+            return;
+        }
         if let Ok(prs_buffer) = TryInto::<PhaseReferenceBuffer>::try_into(buffer) {
-            println!("prs_buffer: {:?}", prs_buffer.block);
-            if self.block_seen == 255 || self.block_seen < 4 {
-                self.append_data(prs_buffer);
+            // println!("prs_buffer: {:?}", prs_buffer.block);
+            if self.blocks_seen.is_empty() && prs_buffer.block == 0 {
+                self.append_data(&prs_buffer);
+            }
+            if !self.blocks_seen.is_empty() && prs_buffer.block > 0 {
+                self.append_data(&prs_buffer);
             }
         }
     }
 
-    fn append_data(&mut self, buffer: PhaseReferenceBuffer) {
-        self.block_seen = buffer.block();
+    fn append_data(&mut self, buffer: &PhaseReferenceBuffer) {
+        self.blocks_seen.insert(buffer.block());
         let block = buffer.block() as usize;
-        self.bytes[block..(block + 512)].copy_from_slice(buffer.data());
+        self.bytes[(block * 512)..((block * 512) + 512)].copy_from_slice(buffer.data());
+    }
+
+    pub fn complete(&self) -> bool {
+        let blocks: [u8; 4] = [0, 1, 2, 3];
+        let blockset = HashSet::from(blocks);
+        let diff = blockset.difference(&self.blocks_seen);
+        diff.count() == 0
+    }
+
+    pub fn vector(&self) -> [Complex64; 2048] {
+        self.bytes.map(|b| c64(0.0, b as f64 - 128.0))
     }
 }
