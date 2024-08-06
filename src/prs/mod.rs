@@ -5,6 +5,8 @@ use std::convert::TryFrom;
 
 mod reference;
 mod sync;
+mod maths;
+mod fft;
 pub use sync::new_synchroniser;
 
 #[derive(Debug)]
