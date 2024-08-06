@@ -22,19 +22,9 @@ pub struct Buffer {
 // Closure / callback implementation from:
 // http://blog.sagetheprogrammer.com/neat-rust-tricks-passing-rust-closures-to-c
 
-pub fn open<F>(buffer_callback: F) -> Wavefinder
-where
-    F: FnMut(Buffer) + 'static,
+pub fn open() -> Wavefinder
 {
-    let data = Box::into_raw(Box::new(buffer_callback));
-
-    // Safety: We've carefully reviewed the docs for the C function
-    // we're calling, and the variants we need to uphold are:
-    // - widget is a valid pointer
-    //    - We're using Rust references so we know this is true.
-    // - data is valid until its destructor is called
-    //     - We've added a `'static` bound to ensure that is true.
-    let w: &mut wf_device = unsafe { &mut *wf_open(Some(call_closure::<F>), data as *mut _) };
+    let w: &mut wf_device = unsafe { &mut *wf_open() };
     Wavefinder { device: w }
 }
 
@@ -70,6 +60,21 @@ mod init;
 mod tune;
 
 impl Wavefinder {
+    pub fn set_callback<F>(&mut self, buffer_callback: F)
+    where
+        F: FnMut(Buffer) + 'static,
+    {
+        let data = Box::into_raw(Box::new(buffer_callback));
+
+        // Safety: We've carefully reviewed the docs for the C function
+        // we're calling, and the variants we need to uphold are:
+        // - widget is a valid pointer
+        //    - We're using Rust references so we know this is true.
+        // - data is valid until its destructor is called
+        //     - We've added a `'static` bound to ensure that is true.
+        unsafe { wf_set_callback(self.device, Some(call_closure::<F>), data as *mut _) };
+    }
+
     pub fn read(&self) {
         unsafe {
             wf_read(self.device);

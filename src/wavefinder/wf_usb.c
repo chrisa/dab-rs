@@ -38,7 +38,7 @@ static void cb_xfr(struct libusb_transfer *xfr)
         }
 }
 
-struct wf_device *wf_open(process_func callback, void *data)
+struct wf_device *wf_open()
 {
         int rc;
         struct wf_device *wf = NULL;
@@ -68,8 +68,6 @@ struct wf_device *wf_open(process_func callback, void *data)
 
         wf->devh = devh;
         wf->bufptr = wf->buf;
-        wf->callback = callback;
-        wf->data = data;
 
         wf->xfr = libusb_alloc_transfer(32);
         if (!wf->xfr)
@@ -82,6 +80,13 @@ struct wf_device *wf_open(process_func callback, void *data)
         return wf;
 }
 
+void wf_set_callback(struct wf_device *wf, process_func callback, void *data)
+{
+        wf->callback = callback;
+        wf->data = data;
+}
+
+
 void wf_close(struct wf_device *wf)
 {
         libusb_release_interface(wf->devh, 0);
@@ -92,6 +97,11 @@ void wf_close(struct wf_device *wf)
 void wf_read(struct wf_device *wf)
 {
         int rc;
+
+        if (wf->callback == NULL || wf->data == NULL) {
+                fprintf(stderr, "callback not set\n");
+                exit(EXIT_FAILURE);
+        }
 
         wf->xfr->user_data = wf;
 

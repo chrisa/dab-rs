@@ -3,6 +3,10 @@ use rustfft::num_complex::{c64, Complex64};
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
+mod reference;
+mod sync;
+pub use sync::new_synchroniser;
+
 #[derive(Debug)]
 pub struct PhaseReferenceBuffer {
     block: u8,
@@ -13,7 +17,6 @@ impl TryFrom<Buffer> for PhaseReferenceBuffer {
     type Error = ();
 
     fn try_from(buffer: Buffer) -> Result<Self, Self::Error> {
-        //println!("try_from: {:?}", &buffer.bytes[0..12]);
         if buffer.bytes[9] == 0x02 {
             let bytes = buffer.bytes;
             let mut prs: [u8; 512] = [0; 512];
@@ -42,7 +45,7 @@ pub struct PhaseReferenceSymbol {
     bytes: [u8; 2048],
 }
 
-pub fn new() -> PhaseReferenceSymbol {
+pub fn new_symbol() -> PhaseReferenceSymbol {
     PhaseReferenceSymbol {
         blocks_seen: Default::default(),
         bytes: [0; 2048],
