@@ -3,11 +3,14 @@ use rustfft::num_complex::{c64, Complex64};
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
+mod fft;
+mod maths;
 mod reference;
 mod sync;
-mod maths;
-mod fft;
 pub use sync::new_synchroniser;
+
+pub const PRS_POINTS: usize = 2048;
+pub type PhaseReferenceArray = [Complex64; PRS_POINTS];
 
 #[derive(Debug)]
 pub struct PhaseReferenceBuffer {
@@ -44,19 +47,19 @@ impl PhaseReferenceBuffer {
 
 pub struct PhaseReferenceSymbol {
     blocks_seen: HashSet<u8>,
-    bytes: [u8; 2048],
+    bytes: [u8; PRS_POINTS],
 }
 
 pub fn new_symbol() -> PhaseReferenceSymbol {
     PhaseReferenceSymbol {
         blocks_seen: Default::default(),
-        bytes: [0; 2048],
+        bytes: [0; PRS_POINTS],
     }
 }
 
 impl PhaseReferenceSymbol {
     pub fn try_buffer(&mut self, buffer: Buffer) {
-        if self.complete() {
+        if self.is_complete() {
             return;
         }
         if let Ok(prs_buffer) = TryInto::<PhaseReferenceBuffer>::try_into(buffer) {
@@ -76,14 +79,14 @@ impl PhaseReferenceSymbol {
         self.bytes[(block * 512)..((block * 512) + 512)].copy_from_slice(buffer.data());
     }
 
-    pub fn complete(&self) -> bool {
+    pub fn is_complete(&self) -> bool {
         let blocks: [u8; 4] = [0, 1, 2, 3];
         let blockset = HashSet::from(blocks);
         let diff = blockset.difference(&self.blocks_seen);
         diff.count() == 0
     }
 
-    pub fn vector(&self) -> [Complex64; 2048] {
+    pub fn vector(&self) -> PhaseReferenceArray {
         self.bytes.map(|b| c64(0.0, b as f64 - 128.0))
     }
 }

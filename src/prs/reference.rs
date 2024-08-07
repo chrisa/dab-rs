@@ -1,3 +1,4 @@
+use crate::prs::PhaseReferenceArray;
 use rustfft::num_complex::{c64, Complex64};
 use std::str::FromStr;
 
@@ -34,7 +35,6 @@ use std::str::FromStr;
 
 // const cospi2: [i32; 4] = [1, 0, -1, 0]; /* cos(0), cos(pi/2), cos(pi), cos(3*pi/2) */
 // const sinpi2: [i32; 4] = [0, 1, 0, -1]; /* sin(0), sin(pi/2), sin(pi), sin(3*pi/2) */
-
 // pub fn prs_reference() -> ([Complex64; 2048], [Complex64; 2048]) {
 //     let mut prs_syms = [c64(0, 0); 2048];
 //     let mut prs_conj = [c64(0, 0); 2048];
@@ -80,14 +80,13 @@ use std::str::FromStr;
 const prs1_gplot: &str = include_str!("prs1.gplot");
 const prs2_gplot: &str = include_str!("prs2.gplot");
 
-pub fn prs_reference_1_2() -> ([Complex64; 2048], [Complex64; 2048]) {
+pub fn prs_reference_1_2() -> (PhaseReferenceArray, PhaseReferenceArray) {
     let prs1 = parse_gplot_file(prs1_gplot);
     let prs2 = parse_gplot_file(prs2_gplot);
     (prs1.try_into().unwrap(), prs2.try_into().unwrap())
 }
 
-fn parse_gplot_file(file: &str) -> Vec<Complex64>
-{
+fn parse_gplot_file(file: &str) -> Vec<Complex64> {
     file.split("\n")
         .filter(|line| !line.is_empty())
         .map(parse_gplot_line)

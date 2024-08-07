@@ -1,12 +1,11 @@
-use rustfft::FftPlanner;
 use rustfft::num_complex::{c64, Complex64};
+use rustfft::FftPlanner;
 
 // static void vec_reverse_real(fftw_complex *vec, int pts)
 // {
 // 	/* The real part of the ifft has reverse order (apart from the
 // 	   DC term) using fftw compared with the Intel SPL functions
 // 	   used in the w!nd*ws software. */
-        
 // 	for (int i = 1; i < pts/2; i++) {
 // 		double t = creal(*(vec+i));
 // 		*(vec+i) = *(vec+i) - t + creal(*(vec+pts-i));
@@ -14,8 +13,7 @@ use rustfft::num_complex::{c64, Complex64};
 // 	}
 // }
 
-fn reverse_real(data: &mut [Complex64; 2048])
-{
+fn reverse_real(data: &mut [Complex64; 2048]) {
     for i in 1..1024 {
         let t = data[i].re;
         data[i] = data[i] - t + data[2048 - i].re;
@@ -28,7 +26,6 @@ fn reverse_real(data: &mut [Complex64; 2048])
 // 	/* The real part of the fft has reverse order using fftw
 // 	   compared with the Intel SPL functions used in the w!nd*ws
 // 	   software */
-
 //         for (int i = 1; i < pts/2; i++) {
 //                 fftw_complex tc = *(vec+i);
 //                 *(vec+i) = *(vec+pts-i);
@@ -36,8 +33,7 @@ fn reverse_real(data: &mut [Complex64; 2048])
 //         }
 // }
 
-fn reverse(data: &mut [Complex64; 2048])
-{
+fn reverse(data: &mut [Complex64; 2048]) {
     for i in 1..1024 {
         // let tc = data[i];
         // data[i] = data[2048-i];
@@ -53,7 +49,7 @@ pub fn ifft(data: &[Complex64; 2048]) -> [Complex64; 2048] {
     let mut planner = FftPlanner::<f64>::new();
     let fft = planner.plan_fft_inverse(2048);
     fft.process(&mut output);
-    // reverse_real(&mut output);
+    reverse_real(&mut output);
     output
 }
 

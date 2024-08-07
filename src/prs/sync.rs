@@ -1,19 +1,21 @@
-use rustfft::num_complex::{c64, Complex64};
+use rustfft::num_complex::c64;
+use rustfft::num_complex::Complex64;
 
+use crate::prs::fft::*;
+use crate::prs::maths::*;
 use crate::prs::reference::prs_reference_1_2;
+use crate::prs::PhaseReferenceArray;
+use crate::prs::PhaseReferenceSymbol;
+use crate::prs::PRS_POINTS;
 use crate::visualiser;
 use crate::visualiser::Visualiser;
-use crate::prs::maths::*;
-use crate::prs::fft::*;
-
-use super::PhaseReferenceSymbol;
 
 use std::time::{Duration, SystemTime};
 
 pub struct PhaseReferenceSynchroniser {
     visualiser: Visualiser,
-    prs1: [Complex64; 2048],
-    prs2: [Complex64; 2048],
+    prs1: PhaseReferenceArray,
+    prs2: PhaseReferenceArray,
     sync: bool,
     count: u8,
     last_cv: SystemTime,
@@ -37,23 +39,32 @@ pub fn new_synchroniser() -> PhaseReferenceSynchroniser {
     }
 }
 
-
-
-fn ref_symbol(offset: usize, source: &[Complex64; 2048]) -> [Complex64; 2080] {
+fn align_reference_symbol(indx: i32, source: &PhaseReferenceArray) -> [Complex64; 2080] {
     let mut symbol = [c64(0, 0); 2080];
-    symbol[offset..(offset + 2048)].copy_from_slice(source);
+    if indx == 0 {
+        symbol[0..PRS_POINTS].copy_from_slice(source);
+        return symbol;
+    }
+    let offset = indx.unsigned_abs() as usize;
+    assert!(offset <= PRS_POINTS);
+    if indx > 0 {
+        symbol[0..offset].copy_from_slice(&source[(PRS_POINTS - offset)..PRS_POINTS]);
+        symbol[offset..PRS_POINTS].copy_from_slice(&source[0..(PRS_POINTS - offset)]);
+    }
+    if indx < 0 {
+        symbol[(PRS_POINTS - offset)..PRS_POINTS].copy_from_slice(&source[0..offset]);
+        symbol[0..(PRS_POINTS - offset)].copy_from_slice(&source[offset..PRS_POINTS]);
+    }
     symbol
 }
 
 impl PhaseReferenceSynchroniser {
     pub fn try_sync_prs(&mut self, prs: &PhaseReferenceSymbol) -> (f64, f64) {
         let rdata = ifft(&prs.vector());
-        self.visualiser.update(rdata);
-
         let (c, prs2_offset) = self.calc_c(&rdata);
         let ir = self.calc_ir(prs2_offset, &prs.vector());
 
-        if (c.abs() < (2.4609375e-4/2.0)) && (ir.abs() < 350.0) {
+        if (c.abs() < (2.4609375e-4 / 2.0)) && (ir.abs() < 350.0) {
             if self.count == 0 {
                 self.sync = true;
             } else {
@@ -73,7 +84,7 @@ impl PhaseReferenceSynchroniser {
         }
 
         let avg_ir = raverage(&mut self.ravg, ir);
-        
+
         if now.duration_since(self.last_afc).unwrap() > Duration::from_millis(250) {
             //sync_afcmsg()
             self.last_afc = now;
@@ -84,31 +95,31 @@ impl PhaseReferenceSynchroniser {
         (c, avg_ir)
     }
 
-    fn calc_c(&self, rdata: &[Complex64; 2048]) -> (f64, usize)
-    {
+    fn calc_c(&mut self, rdata: &PhaseReferenceArray) -> (f64, i32) {
         let mut indx_n = 0i32;
         let mut indxv = 0i32;
         let mut maxv = 0.0;
         let mut c = 4.8828125e-7;
 
         let (count, mut prslocal) = if self.sync {
-            (1_usize, ref_symbol(0, &self.prs1))
+            (1_usize, align_reference_symbol(0, &self.prs1))
         } else {
-            (25, ref_symbol(12, &self.prs1))
+            (25, align_reference_symbol(12, &self.prs1))
         };
 
         /* Copy 0x18 complex points from start of data and append to the end */
         for i in 0..24 {
-            prslocal[2048 + i] = prslocal[i];
+            prslocal[PRS_POINTS + i] = prslocal[i];
         }
 
         for i in 0..count {
-            assert!(i < (2080 - 2048));
-            let offset_prslocal: &[Complex64; 2048] = &prslocal[i..(2048 + i)].try_into().unwrap();
+            assert!(i < (2080 - PRS_POINTS));
+            let offset_prslocal: &PhaseReferenceArray =
+                &prslocal[i..(PRS_POINTS + i)].try_into().unwrap();
             let cdata = mpy(rdata, offset_prslocal, 1024.0);
+            self.visualiser.update(cdata);
             let mdata = fft(&cdata);
             let magdata = mag(&mdata);
-            // dbg!(magdata);
 
             let (mut max, indx) = maxext(&magdata);
             let vmean = mean(&magdata);
@@ -147,16 +158,14 @@ impl PhaseReferenceSynchroniser {
             c *= indxv as f64;
         }
 
-        (c, -indxv as usize)
+        (c, -indxv)
     }
 
-    fn calc_ir(&self, prs2_offset: usize, idata: &[Complex64; 2048]) -> f64
-    {
-        let iprslocal = ref_symbol(prs2_offset, &self.prs2);
-        let mdata = mpy(idata, &iprslocal[0..2048].try_into().unwrap(), 32.0);
+    fn calc_ir(&mut self, prs2_offset: i32, idata: &PhaseReferenceArray) -> f64 {
+        let iprslocal = align_reference_symbol(prs2_offset, &self.prs2);
+        let mdata = mpy(idata, &iprslocal[0..PRS_POINTS].try_into().unwrap(), 32.0);
         let rdata = fft(&mdata);
         let magdata = mag(&rdata);
-        // dbg!(magdata);
 
         let (mut max, indx) = maxext(&magdata);
         let vmean = mean(&magdata);
@@ -168,7 +177,7 @@ impl PhaseReferenceSynchroniser {
 
         if ir > 1024.0 {
             ir -= 2048.0;
-        }    
+        }
 
         let mut stf = 0.666666666;
 
@@ -194,5 +203,4 @@ impl PhaseReferenceSynchroniser {
 
         ir
     }
-
 }

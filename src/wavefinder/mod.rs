@@ -6,6 +6,7 @@ mod bindings {
 }
 
 pub use bindings::*;
+use message::{code_for_kind, Message};
 
 use std::{thread, time::Duration};
 
@@ -22,8 +23,7 @@ pub struct Buffer {
 // Closure / callback implementation from:
 // http://blog.sagetheprogrammer.com/neat-rust-tricks-passing-rust-closures-to-c
 
-pub fn open() -> Wavefinder
-{
+pub fn open() -> Wavefinder {
     let w: &mut wf_device = unsafe { &mut *wf_open() };
     Wavefinder { device: w }
 }
@@ -57,6 +57,7 @@ impl Drop for Wavefinder {
 }
 
 mod init;
+mod message;
 mod tune;
 
 impl Wavefinder {
@@ -81,6 +82,20 @@ impl Wavefinder {
         }
     }
 
+    pub fn send_ctrl_message(&self, message: &Message) -> usize {
+        unsafe {
+            let req: *mut wf_ctrl_request = wf_ctrl_request_init(
+                code_for_kind(&message.kind),
+                message.value,
+                message.index,
+                Box::into_raw(message.bytes.clone()) as *mut u8,
+                message.size,
+                message.async_,
+            );
+            wf_usb_ctrl_msg(self.device, req)
+        }
+    }
+
     fn mem_write(&self, addr: u16, val: u16) -> usize {
         let addr_bytes = addr.to_be_bytes();
         let val_bytes = val.to_be_bytes();
@@ -91,27 +106,8 @@ impl Wavefinder {
     }
 
     fn tune_msg(&self, reg: u32, bits: u8, pll: u8, lband: bool) -> usize {
-        let reg_bytes = reg.to_be_bytes();
-        let mut tbuf: [u8; 12] = [
-            reg_bytes[3],
-            reg_bytes[2],
-            reg_bytes[1],
-            reg_bytes[0],
-            bits,
-            0x00,
-            pll,
-            0x00,
-            lband.into(),
-            0x00,
-            0x00,
-            0x10,
-        ];
-
-        unsafe {
-            let req: *mut wf_ctrl_request =
-                wf_ctrl_request_init(WF_REQ_TUNE, 0, 0, tbuf.as_mut_ptr(), tbuf.len(), false);
-            wf_usb_ctrl_msg(self.device, req)
-        }
+        let message = message::tune_msg(reg, bits, pll, lband);
+        self.send_ctrl_message(&message)
     }
 
     fn timing_msg(&self, buffer: &mut [u8; 32]) -> usize {
@@ -123,17 +119,8 @@ impl Wavefinder {
     }
 
     fn sendmem(&self, value: u32, index: u32, buffer: &mut Vec<u8>) -> usize {
-        unsafe {
-            let req: *mut wf_ctrl_request = wf_ctrl_request_init(
-                WF_REQ_SLMEM,
-                value,
-                index,
-                buffer.as_mut_ptr(),
-                buffer.len(),
-                false,
-            );
-            wf_usb_ctrl_msg(self.device, req)
-        }
+        let message = message::slmem_msg(value, index, buffer);
+        self.send_ctrl_message(&message)
     }
 
     fn r2_msg(&self, buffer: &mut [u8]) -> usize {
