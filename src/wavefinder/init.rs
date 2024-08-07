@@ -100,7 +100,7 @@ impl Wavefinder {
     const UNK0XC120: u16 = 0xc120;
 
     fn load_firmware(&self, firmware: &[u8], addrreg: u16, datareg: u16) {
-        self.sendmem(0, 0, &mut as_u8(vec![addrreg, 0x007f, 0x0000]));
+        self.sendmem(0, 0, &as_u8(vec![addrreg, 0x007f, 0x0000]));
 
         let mut remain: usize = 0x2000 - 0x80 + 1;
 
@@ -120,7 +120,7 @@ impl Wavefinder {
                     ubuf.push(0x00);
                     j += 2;
                 }
-                self.sendmem(datareg as u32, 0, &mut as_u8(ubuf));
+                self.sendmem(datareg as u32, 0, &as_u8(ubuf));
             } else {
                 let left = remain * 2;
                 let mut j = 2;
@@ -131,7 +131,7 @@ impl Wavefinder {
                     ubuf.push(0x00);
                     j += 2;
                 }
-                self.sendmem(datareg as u32, 0, &mut as_u8(ubuf));
+                self.sendmem(datareg as u32, 0, &as_u8(ubuf));
             }
         }
     }
@@ -140,57 +140,42 @@ impl Wavefinder {
         let dspA = include_bytes!("rsDSPa.bin");
         let dspB = include_bytes!("rsDSPb.bin");
 
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPIA_B, 0x00e0, 0x0000]));
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPID_B, 0x0000, 0x0000]));
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPIC_B, 0x0001, 0x0001]));
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPIC_A, 0x0001, 0x0001]));
+        self.sendmem(0, 0, &as_u8(vec![Self::HPIA_B, 0x00e0, 0x0000]));
+        self.sendmem(0, 0, &as_u8(vec![Self::HPID_B, 0x0000, 0x0000]));
+        self.sendmem(0, 0, &as_u8(vec![Self::HPIC_B, 0x0001, 0x0001]));
+        self.sendmem(0, 0, &as_u8(vec![Self::HPIC_A, 0x0001, 0x0001]));
 
         self.load_firmware(dspB, Self::HPIA_B, Self::HPID_B);
         self.load_firmware(dspA, Self::HPIA_A, Self::HPID_A);
 
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPIA_A, 0x007e, 0x0000]));
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPIA_B, 0x007e, 0x0000]));
+        self.sendmem(0, 0, &as_u8(vec![Self::HPIA_A, 0x007e, 0x0000]));
+        self.sendmem(0, 0, &as_u8(vec![Self::HPIA_B, 0x007e, 0x0000]));
         self.sendmem(
             0,
             0,
-            &mut as_u8(vec![Self::HPID_A, dspA[0].into(), dspA[1].into()]),
+            &as_u8(vec![Self::HPID_A, dspA[0].into(), dspA[1].into()]),
         );
         self.sendmem(
             0,
             0,
-            &mut as_u8(vec![Self::HPID_A, dspA[0].into(), dspA[1].into()]),
+            &as_u8(vec![Self::HPID_A, dspA[0].into(), dspA[1].into()]),
         );
         self.sendmem(
             0,
             0,
-            &mut as_u8(vec![Self::HPID_B, dspB[0].into(), dspB[1].into()]),
+            &as_u8(vec![Self::HPID_B, dspB[0].into(), dspB[1].into()]),
         );
         self.sendmem(
             0,
             0,
-            &mut as_u8(vec![Self::HPID_B, dspB[0].into(), dspB[1].into()]),
+            &as_u8(vec![Self::HPID_B, dspB[0].into(), dspB[1].into()]),
         );
 
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPIA_B, 0x00ff, 0x003e]));
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPID_B, 0x0000, 0x0000]));
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPID_B, 0x0000, 0x0000]));
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPIA_A, 0x00ff, 0x001f]));
-        self.sendmem(0, 0, &mut as_u8(vec![Self::HPIA_B, 0x00ff, 0x001f]));
-    }
-
-    fn req1_req2(&self, reqnum: u32, _msgnum: u32) {
-        let mut r2: [u8; 64] = [
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ];
-        if reqnum == 1 {
-            self.r1_msg(&mut r2);
-        } else {
-            self.r2_msg(&mut r2);
-        }
+        self.sendmem(0, 0, &as_u8(vec![Self::HPIA_B, 0x00ff, 0x003e]));
+        self.sendmem(0, 0, &as_u8(vec![Self::HPID_B, 0x0000, 0x0000]));
+        self.sendmem(0, 0, &as_u8(vec![Self::HPID_B, 0x0000, 0x0000]));
+        self.sendmem(0, 0, &as_u8(vec![Self::HPIA_A, 0x00ff, 0x001f]));
+        self.sendmem(0, 0, &as_u8(vec![Self::HPIA_B, 0x00ff, 0x001f]));
     }
 
     fn timing(&self, msgnum: usize) {
@@ -232,7 +217,7 @@ impl Wavefinder {
     }
 
     pub fn init(&self, freq: f64) {
-        self.req1_req2(2, 0);
+        self.r2_msg();
         self.mem_write(Self::PWMCTRLREG, 0);
         self.mem_write(Self::PWMMAXCNT, 0x03ff);
 
@@ -284,7 +269,7 @@ impl Wavefinder {
         self.sleep(77);
         /* The next control message causes the WaveFinder to start sending
         isochronous data */
-        self.req1_req2(1, 1);
+        self.r1_msg();
         self.mem_write(Self::PWMCTRLREG, 0x800f);
         self.timing(1);
         self.timing(2);

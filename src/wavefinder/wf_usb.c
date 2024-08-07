@@ -96,8 +96,6 @@ void wf_close(struct wf_device *wf)
 
 void wf_read(struct wf_device *wf)
 {
-        int rc;
-
         if (wf->callback == NULL || wf->data == NULL) {
                 fprintf(stderr, "callback not set\n");
                 exit(EXIT_FAILURE);
@@ -105,18 +103,19 @@ void wf_read(struct wf_device *wf)
 
         wf->xfr->user_data = wf;
 
-        rc = libusb_submit_transfer(wf->xfr);
+        int rc = libusb_submit_transfer(wf->xfr);
         if (rc != LIBUSB_SUCCESS) {
                 fprintf(stderr, "libusb_submit_transfer: %s\n", libusb_error_name(rc));
                 exit(EXIT_FAILURE);
         }
+}
 
-        for (;;) {
-                rc = libusb_handle_events(NULL);
-                if (rc != LIBUSB_SUCCESS) {
-                        fprintf(stderr, "libusb_handle_events: %s\n", libusb_error_name(rc));
-                        exit(EXIT_FAILURE);
-                }
+void wf_handle_events()
+{
+        int rc = libusb_handle_events(NULL);
+        if (rc != LIBUSB_SUCCESS) {
+                fprintf(stderr, "libusb_handle_events: %s\n", libusb_error_name(rc));
+                exit(EXIT_FAILURE);
         }
 }
 

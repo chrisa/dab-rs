@@ -6,9 +6,14 @@ mod prs;
 mod visualiser;
 mod wavefinder;
 
-use wavefinder::{Buffer, Wavefinder};
+use wavefinder::{Buffer, Channel, Reader, Wavefinder, Writer};
 
 fn main() {
+    let channel = Box::new(Channel::new());
+    let s_channel: &'static mut Channel = Box::leak(channel);
+    let writer = Writer::new(s_channel);
+    let reader = Reader::new(s_channel);
+
     let mut w: Wavefinder = wavefinder::open();
     let mut sync = prs::new_synchroniser();
     let mut prs = prs::new_symbol();
@@ -16,22 +21,22 @@ fn main() {
     let cb = move |buffer: Buffer| {
         prs.try_buffer(buffer);
         if prs.is_complete() {
-            // let i = ifft(prs.vector());
-            // vis.update(i);
-            let (c, ir) = sync.try_sync_prs(&prs);
-            dbg!(c, ir);
+            let messages = sync.try_sync_prs(&prs);
+            for m in messages {
+                writer.write(m);
+            }
             prs = prs::new_symbol();
         }
     };
+
     w.set_callback(cb);
-
-    // let (prs_syms, prs_conj) = prs::prs_reference();
-    // let prs_syms_ifft = ifft(prs_syms);
-    // let prs_conj_ifft = ifft(prs_conj);
-    // let vis1_scale = 128.0;
-    // let mut vis1 = visualiser::create_visualiser("PRS reference", 400, 400, -vis1_scale..vis1_scale, -vis1_scale..vis1_scale);
-    // vis1.update(prs_conj_ifft);
-
     w.init(225.648);
     w.read();
+
+    loop {
+        w.handle_events();
+        while let Some(m) = reader.read() {
+            w.send_ctrl_message(&m);
+        }
+    }
 }

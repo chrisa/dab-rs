@@ -6,7 +6,8 @@ mod bindings {
 }
 
 pub use bindings::*;
-use message::{code_for_kind, Message};
+pub use message::*;
+pub use queue::*;
 
 use std::{thread, time::Duration};
 
@@ -58,6 +59,7 @@ impl Drop for Wavefinder {
 
 mod init;
 mod message;
+mod queue;
 mod tune;
 
 impl Wavefinder {
@@ -82,27 +84,40 @@ impl Wavefinder {
         }
     }
 
+    pub fn handle_events(&self) {
+        unsafe {
+            wf_handle_events();
+        }
+    }
+
     pub fn send_ctrl_message(&self, message: &Message) -> usize {
         unsafe {
+            let ptr = Box::into_raw(message.bytes.clone()) as *mut u8;
             let req: *mut wf_ctrl_request = wf_ctrl_request_init(
                 code_for_kind(&message.kind),
                 message.value,
                 message.index,
-                Box::into_raw(message.bytes.clone()) as *mut u8,
+                ptr,
                 message.size,
                 message.async_,
             );
-            wf_usb_ctrl_msg(self.device, req)
+            let result = wf_usb_ctrl_msg(self.device, req);
+            let _bytes = Box::from_raw(ptr);
+            result
         }
+    }
+
+    fn sendmem(&self, value: u32, index: u32, buffer: &Vec<u8>) -> usize {
+        let message = message::slmem_msg(value, index, buffer);
+        self.send_ctrl_message(&message)
     }
 
     fn mem_write(&self, addr: u16, val: u16) -> usize {
         let addr_bytes = addr.to_be_bytes();
         let val_bytes = val.to_be_bytes();
-
-        let mut bytes = vec![addr_bytes[1], addr_bytes[0], val_bytes[1], val_bytes[0]];
-
-        self.sendmem(addr as u32, val as u32, &mut bytes)
+        let buffer = vec![addr_bytes[1], addr_bytes[0], val_bytes[1], val_bytes[0]];
+        let message = message::slmem_msg(addr as u32, val as u32, &buffer);
+        self.send_ctrl_message(&message)
     }
 
     fn tune_msg(&self, reg: u32, bits: u8, pll: u8, lband: bool) -> usize {
@@ -111,32 +126,18 @@ impl Wavefinder {
     }
 
     fn timing_msg(&self, buffer: &mut [u8; 32]) -> usize {
-        unsafe {
-            let req: *mut wf_ctrl_request =
-                wf_ctrl_request_init(WF_REQ_TIMING, 0, 0, buffer.as_mut_ptr(), 32, false);
-            wf_usb_ctrl_msg(self.device, req)
-        }
-    }
-
-    fn sendmem(&self, value: u32, index: u32, buffer: &mut Vec<u8>) -> usize {
-        let message = message::slmem_msg(value, index, buffer);
+        let message = message::timing_msg(buffer);
         self.send_ctrl_message(&message)
     }
 
-    fn r2_msg(&self, buffer: &mut [u8]) -> usize {
-        unsafe {
-            let req: *mut wf_ctrl_request =
-                wf_ctrl_request_init(2, 0, 0x80, buffer.as_mut_ptr(), buffer.len(), false);
-            wf_usb_ctrl_msg(self.device, req)
-        }
+    fn r2_msg(&self) -> usize {
+        let message = message::r2_msg();
+        self.send_ctrl_message(&message)
     }
 
-    fn r1_msg(&self, buffer: &mut [u8]) -> usize {
-        unsafe {
-            let req: *mut wf_ctrl_request =
-                wf_ctrl_request_init(1, 0, 0x80, buffer.as_mut_ptr(), buffer.len(), false);
-            wf_usb_ctrl_msg(self.device, req)
-        }
+    fn r1_msg(&self) -> usize {
+        let message = message::r1_msg();
+        self.send_ctrl_message(&message)
     }
 
     fn sleep(&self, millis: u64) {

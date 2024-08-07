@@ -29,7 +29,7 @@ pub fn code_for_kind(kind: &MessageKind) -> u32 {
         (MessageKind::Timing, WF_REQ_TIMING),
         (MessageKind::SlMem, WF_REQ_SLMEM),
     ]);
-    *kind_map.get(&kind).unwrap()
+    *kind_map.get(kind).unwrap()
 }
 
 pub fn tune_msg(reg: u32, bits: u8, pll: u8, lband: bool) -> Message {
@@ -58,13 +58,46 @@ pub fn tune_msg(reg: u32, bits: u8, pll: u8, lband: bool) -> Message {
     }
 }
 
-pub fn slmem_msg(value: u32, index: u32, buffer: &mut Vec<u8>) -> Message {
+pub fn slmem_msg(value: u32, index: u32, buffer: &Vec<u8>) -> Message {
     Message {
         kind: MessageKind::SlMem,
         value,
         index,
         bytes: Box::from(buffer.as_slice()),
         size: buffer.len(),
+        async_: false,
+    }
+}
+
+pub fn timing_msg(buffer: &[u8; 32]) -> Message {
+    Message {
+        kind: MessageKind::Timing,
+        value: 0,
+        index: 0,
+        bytes: Box::from(buffer.as_slice()),
+        size: 32,
+        async_: false,
+    }
+}
+
+pub fn r2_msg() -> Message {
+    Message {
+        kind: MessageKind::R2,
+        value: 0,
+        index: 0x80,
+        bytes: Box::from([0; 64]),
+        size: 64,
+        async_: false,
+    }
+}
+
+pub fn r1_msg() -> Message {
+    Message {
+        kind: MessageKind::R1,
+        value: 0,
+        index: 0x80,
+        bytes: Box::from([0; 64]),
+        size: 64,
         async_: false,
     }
 }

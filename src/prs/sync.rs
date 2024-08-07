@@ -9,6 +9,8 @@ use crate::prs::PhaseReferenceSymbol;
 use crate::prs::PRS_POINTS;
 use crate::visualiser;
 use crate::visualiser::Visualiser;
+use crate::wavefinder::timing_msg;
+use crate::wavefinder::Message;
 
 use std::time::{Duration, SystemTime};
 
@@ -21,11 +23,12 @@ pub struct PhaseReferenceSynchroniser {
     last_cv: SystemTime,
     last_afc: SystemTime,
     ravg: RAverage,
+    selstr: [u8; 10],
 }
 
 pub fn new_synchroniser() -> PhaseReferenceSynchroniser {
     let vis: Visualiser =
-        visualiser::create_visualiser("PRS ifft", 400, 400, -8000.0..8000.0, -8000.0..8000.0);
+        visualiser::create_visualiser("PRS ifft", 400, 400, -80000.0..80000.0, -80000.0..80000.0);
     let (prs1, prs2) = prs_reference_1_2();
     PhaseReferenceSynchroniser {
         visualiser: vis,
@@ -36,6 +39,7 @@ pub fn new_synchroniser() -> PhaseReferenceSynchroniser {
         last_cv: SystemTime::now(),
         last_afc: SystemTime::now(),
         ravg: new_raverage(),
+        selstr: [0; 10],
     }
 }
 
@@ -59,7 +63,7 @@ fn align_reference_symbol(indx: i32, source: &PhaseReferenceArray) -> [Complex64
 }
 
 impl PhaseReferenceSynchroniser {
-    pub fn try_sync_prs(&mut self, prs: &PhaseReferenceSymbol) -> (f64, f64) {
+    pub fn try_sync_prs(&mut self, prs: &PhaseReferenceSymbol) -> Vec<Message> {
         let rdata = ifft(&prs.vector());
         let (c, prs2_offset) = self.calc_c(&rdata);
         let ir = self.calc_ir(prs2_offset, &prs.vector());
@@ -76,6 +80,8 @@ impl PhaseReferenceSynchroniser {
             self.sync = false;
         }
 
+        let mut messages: Vec<Message> = Vec::new();
+
         let now = SystemTime::now();
 
         if now.duration_since(self.last_cv).unwrap() > Duration::from_millis(60) {
@@ -90,9 +96,11 @@ impl PhaseReferenceSynchroniser {
             self.last_afc = now;
         }
 
-        // imsg
+        messages.push(self.sync_imsg(avg_ir));
 
-        (c, avg_ir)
+        dbg!(c, avg_ir);
+
+        messages
     }
 
     fn calc_c(&mut self, rdata: &PhaseReferenceArray) -> (f64, i32) {
@@ -202,5 +210,38 @@ impl PhaseReferenceSynchroniser {
         ir *= 1000.0;
 
         ir
+    }
+
+    fn sync_imsg(&mut self, ir: f64) -> Message {
+        const chgstr: [u8; 10] = [0x00, 0xf0, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11];
+
+        let w1: i16 = (ir * 81.66400146484375) as i32 as i16;
+        let w2: i16 = (ir * 1.024) as i32 as i16;
+
+        let mut symstr: [u8; 10] = [0; 10];
+
+        if self.count > 0 {
+            symstr.copy_from_slice(&chgstr);
+            self.count -= 1;
+        } else {
+            symstr.copy_from_slice(&self.selstr);
+        }
+
+        let mut imsg: [u8; 32] = [
+            0x7f, 0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x0f, 0x00,
+        ];
+
+        imsg[2..12].copy_from_slice(&symstr);
+
+        let w1_bytes = w1.to_be_bytes();
+        let w2_bytes = w2.to_be_bytes();
+        imsg[24] = w1_bytes[1];
+        imsg[25] = w1_bytes[0];
+        imsg[26] = w2_bytes[1];
+        imsg[27] = w2_bytes[0];
+
+        timing_msg(&imsg)
     }
 }
