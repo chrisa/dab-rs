@@ -113,10 +113,7 @@ impl Wavefinder {
     }
 
     fn mem_write(&self, addr: u16, val: u16) -> usize {
-        let addr_bytes = addr.to_be_bytes();
-        let val_bytes = val.to_be_bytes();
-        let buffer = vec![addr_bytes[1], addr_bytes[0], val_bytes[1], val_bytes[0]];
-        let message = message::slmem_msg(addr as u32, val as u32, &buffer);
+        let message = message::mem_write_msg(addr, val);
         self.send_ctrl_message(&message)
     }
 

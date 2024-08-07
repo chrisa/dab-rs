@@ -9,6 +9,7 @@ use crate::prs::PhaseReferenceSymbol;
 use crate::prs::PRS_POINTS;
 use crate::visualiser;
 use crate::visualiser::Visualiser;
+use crate::wavefinder::mem_write_msg;
 use crate::wavefinder::timing_msg;
 use crate::wavefinder::Message;
 
@@ -22,6 +23,7 @@ pub struct PhaseReferenceSynchroniser {
     count: u8,
     last_cv: SystemTime,
     last_afc: SystemTime,
+    afc_offset: f64,
     ravg: RAverage,
     selstr: [u8; 10],
 }
@@ -38,6 +40,7 @@ pub fn new_synchroniser() -> PhaseReferenceSynchroniser {
         count: 3,
         last_cv: SystemTime::now(),
         last_afc: SystemTime::now(),
+        afc_offset: 3.25e-1,
         ravg: new_raverage(),
         selstr: [0; 10],
     }
@@ -85,20 +88,22 @@ impl PhaseReferenceSynchroniser {
         let now = SystemTime::now();
 
         if now.duration_since(self.last_cv).unwrap() > Duration::from_millis(60) {
-            //sync_cvmsg()
+            if let Some(m) = self.sync_cvmsg(c) {
+                messages.push(m);
+            }
             self.last_cv = now;
         }
 
         let avg_ir = raverage(&mut self.ravg, ir);
 
         if now.duration_since(self.last_afc).unwrap() > Duration::from_millis(250) {
-            //sync_afcmsg()
+            if let Some(m) = self.sync_afcmsg(avg_ir) {
+                messages.push(m);
+            }
             self.last_afc = now;
         }
 
         messages.push(self.sync_imsg(avg_ir));
-
-        dbg!(c, avg_ir);
 
         messages
     }
@@ -243,5 +248,63 @@ impl PhaseReferenceSynchroniser {
         imsg[27] = w2_bytes[0];
 
         timing_msg(&imsg)
+    }
+
+    /* DAC value - probably used by the AFC systems
+     ** to offset the reference oscillator frequency
+     ** Note the wavefinder firmware, as far as I can see,
+     ** always writes the same value to the DAC!
+     */
+    const DACVALUE: u16 = 0x0366;
+
+    fn sync_afcmsg(&mut self, afcv: f64) -> Option<Message> {
+        let mut a;
+
+        if afcv.abs() > 75.0 {
+            if afcv.abs() > 350.0 {
+                a = afcv * -2.2e-5;
+            } else {
+                a = 1.0 / 4096.0;
+                if afcv > 0.0 {
+                    a = -a;
+                }
+            }
+            a += self.afc_offset;
+            self.afc_offset = a;
+
+            let mut i = (a * 65535.0) as i32;
+            if i > 0xffff {
+                i = 0xffff;
+            }
+
+            let afc_val = i as u16 & 0xfffc;
+            return Some(mem_write_msg(Self::DACVALUE, afc_val));
+        }
+
+        None
+    }
+
+    const OUTREG0: u16 = 0xc01e;
+
+    fn sync_cvmsg(&self, c: f64) -> Option<Message> {
+        let mut i = (c * -8192000.0) as i32;
+        if i != 0 {
+            let mut cv: i32;
+            i += 0x7f;
+            if i > 0 {
+                cv = i;
+                if cv > 0xff {
+                    cv = 0xff;
+                }
+            } else {
+                cv = 0;
+            }
+
+            cv |= 0x1000;
+
+            return Some(mem_write_msg(Self::OUTREG0, cv as u16));
+        }
+
+        None
     }
 }

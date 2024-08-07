@@ -69,6 +69,13 @@ pub fn slmem_msg(value: u32, index: u32, buffer: &Vec<u8>) -> Message {
     }
 }
 
+pub fn mem_write_msg(addr: u16, val: u16) -> Message {
+    let addr_bytes = addr.to_be_bytes();
+    let val_bytes = val.to_be_bytes();
+    let buffer = vec![addr_bytes[1], addr_bytes[0], val_bytes[1], val_bytes[0]];
+    slmem_msg(addr as u32, val as u32, &buffer)
+}
+
 pub fn timing_msg(buffer: &[u8; 32]) -> Message {
     Message {
         kind: MessageKind::Timing,

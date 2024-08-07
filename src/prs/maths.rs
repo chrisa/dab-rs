@@ -22,9 +22,6 @@ pub fn new_raverage() -> RAverage {
 }
 
 pub fn raverage(r: &mut RAverage, ir: f64) -> f64 {
-    // int d, i;
-    // double t;
-
     if r.prev_ir.abs() > 350.0 {
         r.k = 0;
         r.j = 0;
@@ -53,17 +50,6 @@ pub fn raverage(r: &mut RAverage, ir: f64) -> f64 {
 }
 
 pub fn mpy(a: &PhaseReferenceArray, b: &PhaseReferenceArray, scale: f64) -> PhaseReferenceArray {
-    // for (k=0; k < n; k++) {
-    // 	*(dst + k) = (*(srca + k) * *(srcb + k));
-    // 	*(dst + k) = *(dst + k)/1024;
-    // }
-
-    // let mut result = [c64(0, 0); 2048];
-    // for i in 0..2048 {
-    //     result[i] = (a[i] * b[b_offset + i]) / 1024;
-    // }
-    // result
-
     zip(a, b)
         .map(|(v1, v2)| (v1 * v2) / scale)
         .collect::<Vec<Complex64>>()
@@ -72,34 +58,8 @@ pub fn mpy(a: &PhaseReferenceArray, b: &PhaseReferenceArray, scale: f64) -> Phas
 }
 
 pub fn mag(data: &PhaseReferenceArray) -> [f64; PRS_POINTS] {
-    // for (i=0; i < n; i++)
-    //   *(out+i) = cabs(*(in+i))/n;
-
-    // let mut result = [0.0; 2048];
-    // for i in 0..2048 {
-    //     result[i] = data[i].abs() / 2048;
-    // }
-    // result
-
     data.map(|c| c.abs() / PRS_POINTS as f64)
 }
-
-// double maxext(double *in, int n, int *index)
-// {
-// 	int i;
-// 	double max;
-
-// 	max = *in;
-// 	*index = 0;
-
-// 	for (i=1; i < n; i++)
-// 		if (*(in+i) > max) {
-// 			max = *(in+i);
-// 			*index = i;
-// 		}
-
-// 	return(max);
-// }
 
 pub fn maxext(data: &[f64; PRS_POINTS]) -> (f64, i32) {
     let mut index = 0i32;
@@ -115,52 +75,12 @@ pub fn maxext(data: &[f64; PRS_POINTS]) -> (f64, i32) {
     (max, index)
 }
 
-// double mean(double *in, int n)
-// {
-// 	int i;
-
-// 	double out = 0.0L;
-
-// 	for (i=0; i < n; i++)
-// 		out += *(in+i);
-
-// 	out = out/n;
-
-// 	return(out);
-// }
-
 pub fn mean(data: &[f64; PRS_POINTS]) -> f64 {
     let sum: f64 = data.iter().sum();
     sum / PRS_POINTS as f64
 }
 
 pub fn peak(data: &[f64; PRS_POINTS], indx: i32) -> i32 {
-    // 	double b, c, d, bmax = 0.0;
-    // 	int a, i, l;
-    // 	int pts = 0x800;
-    // 	int res = 0;
-
-    // 	a = indx - 0x1f8 + pts;
-    // 	b = 0x1f8 / 2;
-    // 	l = a + b - 1;
-
-    // 	for (i = 0; i < (2 * 0x1f8); i++) {
-    // 		c = *(magdata + ((pts - 0x1f8 / 2 + a) % 0x800));
-    // 		d = *(magdata + (l % 0x800));
-    // 		b = b + d - c;
-    // 		if (b > bmax) {
-    // 			bmax = b;
-    // 			res = a % 0x800;
-    // 		}
-    // 		l++;
-    // 		a++;
-    // 	}
-
-    // 	if (res > 0x400)
-    // 		res = res - 0x800;
-
-    // 	return (res);
-    // }
     let mut a = indx - 504 + 2048;
     let mut b: f64 = 504.0 / 2.0;
     let mut l = a + (504 / 2) - 1;
