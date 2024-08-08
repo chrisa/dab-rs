@@ -16,33 +16,48 @@ use crate::wavefinder::Message;
 use std::time::{Duration, SystemTime};
 
 pub struct PhaseReferenceSynchroniser {
-    visualiser: Visualiser,
+    complex_vis: Visualiser,
+    magnitude_vis: Visualiser,
     prs1: PhaseReferenceArray,
     prs2: PhaseReferenceArray,
-    sync: bool,
-    count: u8,
+    lock: bool,
+    lock_count: u8,
     last_cv: SystemTime,
     last_afc: SystemTime,
     afc_offset: f64,
     ravg: RAverage,
     selstr: [u8; 10],
+    count: i32,
 }
 
 pub fn new_synchroniser() -> PhaseReferenceSynchroniser {
-    let vis: Visualiser =
-        visualiser::create_visualiser("PRS ifft", 400, 400, -80000.0..80000.0, -80000.0..80000.0);
+    let complex_vis: Visualiser = visualiser::create_visualiser(
+        "PRS ifft",
+        400,
+        400,
+        -80000.0..80000.0,
+        -80000.0..80000.0,
+        "real",
+        "imag",
+    );
+
+    let magnitude_vis: Visualiser =
+        visualiser::create_visualiser("PRS mag", 200, 400, 0.0..2048.0, 0.0..2000.0, "freq", "mag");
+
     let (prs1, prs2) = prs_reference_1_2();
     PhaseReferenceSynchroniser {
-        visualiser: vis,
+        complex_vis,
+        magnitude_vis,
         prs1,
         prs2,
-        sync: false,
-        count: 3,
-        last_cv: SystemTime::now(),
-        last_afc: SystemTime::now(),
+        lock: false,
+        lock_count: 3,
+        last_cv: SystemTime::UNIX_EPOCH,
+        last_afc: SystemTime::UNIX_EPOCH,
         afc_offset: 3.25e-1,
         ravg: new_raverage(),
-        selstr: [0; 10],
+        selstr: [0xff; 10],
+        count: 0,
     }
 }
 
@@ -72,15 +87,17 @@ impl PhaseReferenceSynchroniser {
         let ir = self.calc_ir(prs2_offset, &prs.vector());
 
         if (c.abs() < (2.4609375e-4 / 2.0)) && (ir.abs() < 350.0) {
-            if self.count == 0 {
-                self.sync = true;
+            // dbg!(c, ir);
+
+            if self.lock_count == 0 {
+                self.lock = true;
             } else {
-                self.count -= 1;
-                self.sync = false;
+                self.lock_count -= 1;
+                self.lock = false;
             }
         } else {
-            self.count = 3;
-            self.sync = false;
+            self.lock_count = 3;
+            self.lock = false;
         }
 
         let mut messages: Vec<Message> = Vec::new();
@@ -103,6 +120,7 @@ impl PhaseReferenceSynchroniser {
             self.last_afc = now;
         }
 
+        println!("avg_ir: {:?}", avg_ir);
         messages.push(self.sync_imsg(avg_ir));
 
         messages
@@ -114,7 +132,7 @@ impl PhaseReferenceSynchroniser {
         let mut maxv = 0.0;
         let mut c = 4.8828125e-7;
 
-        let (count, mut prslocal) = if self.sync {
+        let (count, mut prslocal) = if self.lock {
             (1_usize, align_reference_symbol(0, &self.prs1))
         } else {
             (25, align_reference_symbol(12, &self.prs1))
@@ -130,9 +148,10 @@ impl PhaseReferenceSynchroniser {
             let offset_prslocal: &PhaseReferenceArray =
                 &prslocal[i..(PRS_POINTS + i)].try_into().unwrap();
             let cdata = mpy(rdata, offset_prslocal, 1024.0);
-            self.visualiser.update(cdata);
+            self.complex_vis.update_complex(&cdata);
             let mdata = fft(&cdata);
             let magdata = mag(&mdata);
+            self.magnitude_vis.update_mag(&magdata);
 
             let (mut max, indx) = maxext(&magdata);
             let vmean = mean(&magdata);
@@ -140,7 +159,7 @@ impl PhaseReferenceSynchroniser {
                 max = 0.0;
             }
 
-            if self.sync {
+            if self.lock {
                 indx_n = peak(&magdata, indx);
                 indx_n /= 15;
 
@@ -165,7 +184,7 @@ impl PhaseReferenceSynchroniser {
             indxv = 2048 - indxv;
         }
 
-        if self.sync {
+        if self.lock {
             c *= indx_n as f64;
         } else {
             c *= indxv as f64;
@@ -179,8 +198,11 @@ impl PhaseReferenceSynchroniser {
         let mdata = mpy(idata, &iprslocal[0..PRS_POINTS].try_into().unwrap(), 32.0);
         let rdata = fft(&mdata);
         let magdata = mag(&rdata);
-
         let (mut max, indx) = maxext(&magdata);
+
+        // self.complex_vis.update_complex(&mdata);
+        // self.magnitude_vis.update_mag(&magdata);
+
         let vmean = mean(&magdata);
         if (vmean * 14.0) > max {
             max = 0.0;

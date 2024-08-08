@@ -1,6 +1,5 @@
 use crate::wavefinder::Buffer;
 use rustfft::num_complex::{c64, Complex64};
-use std::collections::HashSet;
 use std::convert::TryFrom;
 
 mod fft;
@@ -18,10 +17,10 @@ pub struct PhaseReferenceBuffer {
     bytes: [u8; 512],
 }
 
-impl TryFrom<Buffer> for PhaseReferenceBuffer {
+impl TryFrom<&Buffer> for PhaseReferenceBuffer {
     type Error = ();
 
-    fn try_from(buffer: Buffer) -> Result<Self, Self::Error> {
+    fn try_from(buffer: &Buffer) -> Result<Self, Self::Error> {
         if buffer.bytes[9] == 0x02 {
             let bytes = buffer.bytes;
             let mut prs: [u8; 512] = [0; 512];
@@ -36,54 +35,39 @@ impl TryFrom<Buffer> for PhaseReferenceBuffer {
     }
 }
 
-impl PhaseReferenceBuffer {
-    fn data(&self) -> &[u8] {
-        &self.bytes
-    }
-    fn block(&self) -> u8 {
-        self.block
-    }
-}
-
 pub struct PhaseReferenceSymbol {
-    blocks_seen: HashSet<u8>,
+    next_block: u8,
     bytes: [u8; PRS_POINTS],
 }
 
 pub fn new_symbol() -> PhaseReferenceSymbol {
     PhaseReferenceSymbol {
-        blocks_seen: Default::default(),
+        next_block: 0,
         bytes: [0; PRS_POINTS],
     }
 }
 
 impl PhaseReferenceSymbol {
-    pub fn try_buffer(&mut self, buffer: Buffer) {
+    pub fn try_buffer(&mut self, buffer: &Buffer) {
         if self.is_complete() {
             return;
         }
         if let Ok(prs_buffer) = TryInto::<PhaseReferenceBuffer>::try_into(buffer) {
-            // println!("prs_buffer: {:?}", prs_buffer.block);
-            if self.blocks_seen.is_empty() && prs_buffer.block == 0 {
-                self.append_data(&prs_buffer);
-            }
-            if !self.blocks_seen.is_empty() && prs_buffer.block > 0 {
+            if prs_buffer.block == self.next_block {
+                println!("PRS block: {:?}", prs_buffer.block);
                 self.append_data(&prs_buffer);
             }
         }
     }
 
     fn append_data(&mut self, buffer: &PhaseReferenceBuffer) {
-        self.blocks_seen.insert(buffer.block());
-        let block = buffer.block() as usize;
-        self.bytes[(block * 512)..((block * 512) + 512)].copy_from_slice(buffer.data());
+        let block = buffer.block as usize;
+        self.bytes[(block * 512)..((block * 512) + 512)].copy_from_slice(&buffer.bytes);
+        self.next_block += 1;
     }
 
     pub fn is_complete(&self) -> bool {
-        let blocks: [u8; 4] = [0, 1, 2, 3];
-        let blockset = HashSet::from(blocks);
-        let diff = blockset.difference(&self.blocks_seen);
-        diff.count() == 0
+        self.next_block == 4
     }
 
     pub fn vector(&self) -> PhaseReferenceArray {

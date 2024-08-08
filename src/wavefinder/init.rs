@@ -158,16 +158,6 @@ impl Wavefinder {
         self.sendmem(
             0,
             0,
-            &as_u8(vec![Self::HPID_A, dspA[0].into(), dspA[1].into()]),
-        );
-        self.sendmem(
-            0,
-            0,
-            &as_u8(vec![Self::HPID_B, dspB[0].into(), dspB[1].into()]),
-        );
-        self.sendmem(
-            0,
-            0,
             &as_u8(vec![Self::HPID_B, dspB[0].into(), dspB[1].into()]),
         );
 

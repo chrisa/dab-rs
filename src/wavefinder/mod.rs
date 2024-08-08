@@ -18,7 +18,7 @@ pub struct Wavefinder {
 
 #[derive(Debug)]
 pub struct Buffer {
-    pub bytes: [u8; 2048],
+    pub bytes: [u8; 524],
 }
 
 // Closure / callback implementation from:
@@ -37,18 +37,18 @@ unsafe extern "C" fn call_closure<F>(
     _w: *mut wf_device,
     data: *mut ::std::os::raw::c_void,
     buf: *mut ::std::os::raw::c_uchar,
+    len: usize,
 ) where
     F: FnMut(Buffer),
 {
     let callback_ptr = data as *mut F;
     let callback = &mut *callback_ptr;
-
-    let slice = unsafe { std::slice::from_raw_parts(buf, 2048) };
-    let buffer = Buffer {
-        bytes: slice.try_into().unwrap(),
-    };
-
-    callback(buffer);
+    let slice = unsafe { std::slice::from_raw_parts(buf, len) };
+    if let Ok(bytes) = slice.try_into() {
+        callback(Buffer { bytes });
+    } else {
+        println!("short read? len = {:?}", len);
+    }
 }
 
 impl Drop for Wavefinder {
@@ -91,8 +91,9 @@ impl Wavefinder {
     }
 
     pub fn send_ctrl_message(&self, message: &Message) -> usize {
+        let ptr = Box::into_raw(message.bytes.clone()) as *mut u8;
+        dbg!(message);
         unsafe {
-            let ptr = Box::into_raw(message.bytes.clone()) as *mut u8;
             let req: *mut wf_ctrl_request = wf_ctrl_request_init(
                 code_for_kind(&message.kind),
                 message.value,

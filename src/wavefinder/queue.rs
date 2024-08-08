@@ -1,3 +1,5 @@
+// https://stackoverflow.com/a/78551675
+
 use std::cell::RefCell;
 
 use super::Message;

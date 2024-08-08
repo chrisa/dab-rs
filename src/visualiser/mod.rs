@@ -1,5 +1,6 @@
 use std::{
     borrow::{Borrow, BorrowMut},
+    iter::zip,
     ops::Range,
 };
 
@@ -29,9 +30,11 @@ pub fn create_visualiser(
     width: usize,
     x_range: Range<f64>,
     y_range: Range<f64>,
+    x_desc: &str,
+    y_desc: &str,
 ) -> Visualiser {
     let (mut window, cs, pixel_buf) =
-        setup_window(name, height, width, x_range, y_range, "real", "imag");
+        setup_window(name, height, width, x_range, y_range, x_desc, y_desc);
     window.set_target_fps(144);
 
     Visualiser {
@@ -44,16 +47,28 @@ pub fn create_visualiser(
 }
 
 impl Visualiser {
-    pub fn update(&mut self, data: [Complex64; 2048]) {
+    pub fn update_complex(&mut self, data: &[Complex64; 2048]) {
+        let data_iter = data.map(|c| (c.re, c.im));
+        self.update(&data_iter);
+    }
+
+    pub fn update_mag(&mut self, data: &[f64; 2048]) {
+        let x: [f64; 2048] = core::array::from_fn(|i| i as f64);
+        let y: [f64; 2048] = *data;
+        let iter = zip(x, y);
+        let arr: [(f64, f64); 2048] = iter.collect::<Vec<(f64, f64)>>().try_into().unwrap();
+        self.update(&arr);
+    }
+
+    pub fn update(&mut self, data: &[(f64, f64); 2048]) {
         let drawing_area = get_drawing_area(self.pixel_buf.borrow_mut(), self.width, self.height);
         let mut chart = self.cs.clone().restore(&drawing_area);
         chart.plotting_area().fill(&BLACK).borrow();
 
         // draw
-        let data_iter = data.map(|c| (c.re, c.im));
 
         chart
-            .draw_series(data_iter.map(|(x, y)| Circle::new((x, y), 1, CYAN.filled())))
+            .draw_series(data.map(|(x, y)| Circle::new((x, y), 1, CYAN.filled())))
             .unwrap();
         drop(drawing_area);
         drop(chart);

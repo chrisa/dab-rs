@@ -27,7 +27,7 @@ static void cb_xfr(struct libusb_transfer *xfr)
                         exit(5);
                 }
 
-                (wf->callback)(wf, wf->data, buf);
+                (wf->callback)(wf, wf->data, buf, pack->actual_length);
         }
 
         xfr->user_data = wf;

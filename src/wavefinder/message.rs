@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 use super::{WF_REQ_SLMEM, WF_REQ_TIMING, WF_REQ_TUNE};
 
@@ -11,7 +11,7 @@ pub enum MessageKind {
     SlMem,
 }
 
-#[derive(Debug)]
+// #[derive(Debug)]
 pub struct Message {
     pub kind: MessageKind,
     pub value: u32,
@@ -19,6 +19,21 @@ pub struct Message {
     pub bytes: Box<[u8]>,
     pub size: usize,
     pub async_: bool,
+}
+
+impl fmt::Debug for Message {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = String::new();
+        for i in self.bytes.iter() {
+            let string = format!("0x{:02x} ", i);
+            s.push_str(&string);
+        }
+        write!(
+            f,
+            "{:?} 0x{:04x} 0x{:04x} ({:?}) {:?}",
+            self.kind, self.value, self.index, self.size, s
+        )
+    }
 }
 
 pub fn code_for_kind(kind: &MessageKind) -> u32 {

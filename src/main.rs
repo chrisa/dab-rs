@@ -2,10 +2,13 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 
+mod decode;
+mod fic;
 mod prs;
 mod visualiser;
 mod wavefinder;
 
+use fic::FastInformationChannelBuffer;
 use wavefinder::{Buffer, Channel, Reader, Wavefinder, Writer};
 
 fn main() {
@@ -19,13 +22,20 @@ fn main() {
     let mut prs = prs::new_symbol();
 
     let cb = move |buffer: Buffer| {
-        prs.try_buffer(buffer);
+        // Phase Reference Symbol
+        prs.try_buffer(&buffer);
         if prs.is_complete() {
             let messages = sync.try_sync_prs(&prs);
             for m in messages {
                 writer.write(m);
             }
             prs = prs::new_symbol();
+        }
+
+        // Fast Information Channel
+        // to move into FICFrame(?)
+        if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
+            dbg!(fic_buffer.frame(), fic_buffer.symbol());
         }
     };
 

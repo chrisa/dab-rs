@@ -17,7 +17,7 @@ typedef struct wf_device {
     struct libusb_transfer *ctrl_xfr;
     unsigned char buf[WF_PIPESIZE];
     unsigned char *bufptr;
-    void (*callback)(struct wf_device *, void *, unsigned char *);
+    void (*callback)(struct wf_device *, void *, unsigned char *, size_t len);
     void *data;
 } device;
 
@@ -30,7 +30,7 @@ typedef struct wf_ctrl_request {
     int async;
 } ctrl_req;
 
-typedef void (*process_func)(struct wf_device *wf, void *data, unsigned char *buf);
+typedef void (*process_func)(struct wf_device *wf, void *data, unsigned char *buf, size_t len);
 
 struct wf_device *wf_open();
 void wf_set_callback(struct wf_device *wf, process_func callback, void *data);
