@@ -9,33 +9,41 @@ mod visualiser;
 mod wavefinder;
 
 use fic::FastInformationChannelBuffer;
-use wavefinder::{Buffer, Channel, Reader, Wavefinder, Writer};
+use std::cell::RefCell;
+use std::sync::mpsc;
+use std::thread;
+use wavefinder::{Buffer, Wavefinder};
 
 fn main() {
-    let channel = Box::new(Channel::new());
-    let s_channel: &'static mut Channel = Box::leak(channel);
-    let writer = Writer::new(s_channel);
-    let reader = Reader::new(s_channel);
-
     let mut w: Wavefinder = wavefinder::open();
-    let mut sync = prs::new_synchroniser();
-    let mut prs = prs::new_symbol();
+    let prs = RefCell::new(prs::new_symbol());
+
+    let (message_tx, message_rx) = mpsc::channel();
+    let (prs_tx, prs_rx) = mpsc::channel();
+    let (fic_tx, fic_rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let mut sync = prs::new_synchroniser();
+        let result = prs_rx.recv();
+        while let Ok(complete_prs) = result {
+            let messages = sync.try_sync_prs(complete_prs);
+            for m in messages {
+                message_tx.send(m).unwrap(); // handle Err?
+            }
+        }
+    });
 
     let cb = move |buffer: Buffer| {
         // Phase Reference Symbol
-        prs.try_buffer(&buffer);
-        if prs.is_complete() {
-            let messages = sync.try_sync_prs(&prs);
-            for m in messages {
-                writer.write(m);
-            }
-            prs = prs::new_symbol();
+        prs.borrow_mut().try_buffer(&buffer);
+        if prs.borrow_mut().is_complete() {
+            let p = prs.replace_with(|_| prs::new_symbol());
+            prs_tx.send(p).unwrap();
         }
 
         // Fast Information Channel
-        // to move into FICFrame(?)
         if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
-            dbg!(fic_buffer.frame(), fic_buffer.symbol());
+            fic_tx.send(fic_buffer).unwrap();
         }
     };
 
@@ -45,7 +53,7 @@ fn main() {
 
     loop {
         w.handle_events();
-        while let Some(m) = reader.read() {
+        while let Ok(m) = message_rx.try_recv() {
             w.send_ctrl_message(&m);
         }
     }

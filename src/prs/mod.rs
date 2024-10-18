@@ -35,6 +35,7 @@ impl TryFrom<&Buffer> for PhaseReferenceBuffer {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct PhaseReferenceSymbol {
     next_block: u8,
     bytes: [u8; PRS_POINTS],
@@ -54,7 +55,6 @@ impl PhaseReferenceSymbol {
         }
         if let Ok(prs_buffer) = TryInto::<PhaseReferenceBuffer>::try_into(buffer) {
             if prs_buffer.block == self.next_block {
-                println!("PRS block: {:?}", prs_buffer.block);
                 self.append_data(&prs_buffer);
             }
         }

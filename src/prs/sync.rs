@@ -81,14 +81,12 @@ fn align_reference_symbol(indx: i32, source: &PhaseReferenceArray) -> [Complex64
 }
 
 impl PhaseReferenceSynchroniser {
-    pub fn try_sync_prs(&mut self, prs: &PhaseReferenceSymbol) -> Vec<Message> {
+    pub fn try_sync_prs(&mut self, prs: PhaseReferenceSymbol) -> Vec<Message> {
         let rdata = ifft(&prs.vector());
         let (c, prs2_offset) = self.calc_c(&rdata);
         let ir = self.calc_ir(prs2_offset, &prs.vector());
 
-        if (c.abs() < (2.4609375e-4 / 2.0)) && (ir.abs() < 350.0) {
-            // dbg!(c, ir);
-
+        if (c.abs() < (2.4609375e-4 / 2.0)) && (ir.abs() < 3500.0) {
             if self.lock_count == 0 {
                 self.lock = true;
             } else {
@@ -120,7 +118,6 @@ impl PhaseReferenceSynchroniser {
             self.last_afc = now;
         }
 
-        println!("avg_ir: {:?}", avg_ir);
         messages.push(self.sync_imsg(avg_ir));
 
         messages

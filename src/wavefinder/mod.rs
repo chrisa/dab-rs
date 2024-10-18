@@ -7,7 +7,6 @@ mod bindings {
 
 pub use bindings::*;
 pub use message::*;
-pub use queue::*;
 
 use std::{thread, time::Duration};
 
@@ -59,7 +58,6 @@ impl Drop for Wavefinder {
 
 mod init;
 mod message;
-mod queue;
 mod tune;
 
 impl Wavefinder {
@@ -92,7 +90,6 @@ impl Wavefinder {
 
     pub fn send_ctrl_message(&self, message: &Message) -> usize {
         let ptr = Box::into_raw(message.bytes.clone()) as *mut u8;
-        dbg!(message);
         unsafe {
             let req: *mut wf_ctrl_request = wf_ctrl_request_init(
                 code_for_kind(&message.kind),
