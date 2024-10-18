@@ -13,6 +13,8 @@ use crate::wavefinder::mem_write_msg;
 use crate::wavefinder::timing_msg;
 use crate::wavefinder::Message;
 
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::time::{Duration, SystemTime};
 
 pub struct PhaseReferenceSynchroniser {
@@ -20,7 +22,6 @@ pub struct PhaseReferenceSynchroniser {
     // magnitude_vis: Visualiser,
     prs1: PhaseReferenceArray,
     prs2: PhaseReferenceArray,
-    lock: bool,
     lock_count: u8,
     last_cv: SystemTime,
     last_afc: SystemTime,
@@ -28,9 +29,10 @@ pub struct PhaseReferenceSynchroniser {
     ravg: RAverage,
     selstr: [u8; 10],
     count: i32,
+    LOCKED: &'static AtomicBool,
 }
 
-pub fn new_synchroniser() -> PhaseReferenceSynchroniser {
+pub fn new_synchroniser(LOCKED: &'static AtomicBool) -> PhaseReferenceSynchroniser {
     // let complex_vis: Visualiser = visualiser::create_visualiser(
     //     "PRS ifft",
     //     400,
@@ -50,7 +52,6 @@ pub fn new_synchroniser() -> PhaseReferenceSynchroniser {
         // magnitude_vis,
         prs1,
         prs2,
-        lock: false,
         lock_count: 3,
         last_cv: SystemTime::UNIX_EPOCH,
         last_afc: SystemTime::UNIX_EPOCH,
@@ -58,6 +59,7 @@ pub fn new_synchroniser() -> PhaseReferenceSynchroniser {
         ravg: new_raverage(),
         selstr: [0xff; 10],
         count: 0,
+        LOCKED,
     }
 }
 
@@ -81,24 +83,42 @@ fn align_reference_symbol(indx: i32, source: &PhaseReferenceArray) -> [Complex64
 }
 
 impl PhaseReferenceSynchroniser {
+
+    fn locked(&self) -> bool {
+        self.LOCKED.load(Ordering::Relaxed)
+    }
+
+    fn lock(&mut self) -> bool {
+        if self.lock_count >= 1 {
+            self.lock_count -= 1;
+            false
+        }
+        else {
+            self.lock_count = 0;
+            self.LOCKED.store(true, Ordering::Relaxed);
+            true
+        }
+    }
+
+    fn unlock(&mut self) {
+        self.lock_count = 3;
+        self.LOCKED.store(false, Ordering::Relaxed);
+    }
+
     pub fn try_sync_prs(&mut self, prs: PhaseReferenceSymbol) -> Vec<Message> {
         let rdata = ifft(&prs.vector());
         let (c, prs2_offset) = self.calc_c(&rdata);
         let ir = self.calc_ir(prs2_offset, &prs.vector());
 
         if (c.abs() < (2.4609375e-4 / 2.0)) && (ir.abs() < 350.0) {
-            if self.lock_count == 0 {
+            if self.lock() {
                 println!("locked: {:12.10} {:.2}", c, ir);
-                self.lock = true;
             } else {
                 println!("not yet locked: {:12.10} {:.2}", c, ir);
-                self.lock_count -= 1;
-                self.lock = false;
             }
         } else {
             println!("unlocked: {:12.10} {:.2}", c, ir);
-            self.lock_count = 3;
-            self.lock = false;
+            self.unlock();
         }
 
         let mut messages: Vec<Message> = Vec::new();
@@ -132,7 +152,7 @@ impl PhaseReferenceSynchroniser {
         let mut maxv = 0.0;
         let mut c = 4.8828125e-7;
 
-        let (count, mut prslocal) = if self.lock {
+        let (count, mut prslocal) = if self.locked() {
             (1_usize, align_reference_symbol(0, &self.prs1))
         } else {
             (25, align_reference_symbol(12, &self.prs1))
@@ -159,7 +179,7 @@ impl PhaseReferenceSynchroniser {
                 max = 0.0;
             }
 
-            if self.lock {
+            if self.locked() {
                 indx_n = peak(&magdata, indx);
                 indx_n /= 15;
 
@@ -184,7 +204,7 @@ impl PhaseReferenceSynchroniser {
             indxv = 2048 - indxv;
         }
 
-        if self.lock {
+        if self.locked() {
             c *= indx_n as f64;
         } else {
             c *= indxv as f64;

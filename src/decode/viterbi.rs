@@ -91,18 +91,19 @@ impl Viterbi {
 
         for n in 0..K {
             let mut k = self.table49[n as usize];
-            if k < 0 {
-                k += K / 2;
-            } else if k > 0 {
-                k += K / 2 - 1;
-            }
+
+            k += match k {
+                n if n < 0 => K / 2,
+                n if n > 0 => K / 2 - 1,
+                _ => 0,
+            };
             // now, 0 <= k  < 768
 
-            slice.set(2 * n as usize + 0, bits[2 * k as usize + 0]);
+            slice.set(2 * n as usize    , bits[2 * k as usize    ]);
             slice.set(2 * n as usize + 1, bits[2 * k as usize + 1]);
         }
 
-        bits.copy_from_bitslice(&slice);
+        bits.copy_from_bitslice(slice);
     }
 
     pub fn qpsk_symbol_demapper(&self, bits: &mut FicSymbol) {
@@ -110,11 +111,11 @@ impl Viterbi {
         let slice = result.as_mut_bitslice();
 
         for n in 0..K as usize {
-            slice.set(n, bits[(2 * n) + 0]);
+            slice.set(n, bits[2 * n]);
             slice.set(n + K as usize, bits[(2 * n) + 1]);
         }
 
-        bits.copy_from_bitslice(&slice);
+        bits.copy_from_bitslice(slice);
     }
 
     // pub fn depuncture(&self, bits: &Fic2304) -> Fic3096 {

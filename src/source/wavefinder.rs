@@ -1,6 +1,7 @@
 use fic::FastInformationChannelBuffer;
 use std::cell::RefCell;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
 use std::thread;
 use std::io::BufWriter;
@@ -8,6 +9,8 @@ use std::fs::File;
 
 use crate::{fic, wavefinder, prs};
 use crate::wavefinder::{Buffer, Wavefinder};
+
+static LOCKED: AtomicBool = AtomicBool::new(false);
 
 pub fn run(path: Option<PathBuf>) {
     let file_output = path.is_some();
@@ -20,7 +23,7 @@ pub fn run(path: Option<PathBuf>) {
     let (fic_tx, fic_rx) = mpsc::channel();
 
     thread::spawn(move || {
-        let mut sync = prs::new_synchroniser();
+        let mut sync = prs::new_synchroniser(&LOCKED);
         loop {
             let result = prs_rx.recv();
             if let Ok(complete_prs) = result {
@@ -53,6 +56,7 @@ pub fn run(path: Option<PathBuf>) {
                 }
             }
         });
+
     }
 
     let cb = move |buffer: Buffer| {
@@ -63,14 +67,16 @@ pub fn run(path: Option<PathBuf>) {
             prs_tx.send(p).unwrap();
         }
 
-        // Fast Information Channel
-        if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
-            fic_tx.send(fic_buffer).unwrap();
-        }
+        if LOCKED.load(std::sync::atomic::Ordering::Relaxed) {
+            // Fast Information Channel
+            if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
+                fic_tx.send(fic_buffer).unwrap();
+            }
 
-        // File writer
-        if file_output {
-            file_tx.send(buffer).unwrap();
+            // File writer
+            if file_output {
+                file_tx.send(buffer).unwrap();
+            }
         }
     };
 

@@ -22,7 +22,7 @@ pub fn new_decoder() -> FastInformationChannelDecoder {
 impl fmt::Debug for FastInformationChannelDecoder {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = String::new();
-        for i in 0..32 as usize {
+        for i in 0..32 {
             if let Some(frame) = self.frames[i] {
                 let frame_string = match frame.next_symbol {
                     2 => format!("{:?}[] ", frame.frame_number),
@@ -78,7 +78,7 @@ impl FastInformationChannelDecoder {
     }
 
     fn decode_and_crc(&self, mut frame: &FastInformationChannelFrame) -> bool {
-        let syms = frame.bytes.map(|bytes| byte_to_bit(bytes));
+        let syms = frame.bytes.map(byte_to_bit);
         for mut sym in syms {
             bit_reverse(&mut sym);
             self.viterbi.frequency_deinterleave(&mut sym);
