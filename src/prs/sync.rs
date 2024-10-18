@@ -86,21 +86,17 @@ impl PhaseReferenceSynchroniser {
         let (c, prs2_offset) = self.calc_c(&rdata);
         let ir = self.calc_ir(prs2_offset, &prs.vector());
 
-        dbg!(c, ir);
-
-        //	if ((fabs(c) < (2.4609375e-4/2)) && (fabs(ir) < 350)) {
-
         if (c.abs() < (2.4609375e-4 / 2.0)) && (ir.abs() < 350.0) {
             if self.lock_count == 0 {
-                dbg!("locked");
+                println!("locked: {:12.10} {:.2}", c, ir);
                 self.lock = true;
             } else {
-                dbg!("NOT locked");
+                println!("not yet locked: {:12.10} {:.2}", c, ir);
                 self.lock_count -= 1;
                 self.lock = false;
             }
         } else {
-            dbg!("UN locked");
+            println!("unlocked: {:12.10} {:.2}", c, ir);
             self.lock_count = 3;
             self.lock = false;
         }
@@ -152,10 +148,10 @@ impl PhaseReferenceSynchroniser {
             let offset_prslocal: &PhaseReferenceArray =
                 &prslocal[i..(PRS_POINTS + i)].try_into().unwrap();
             let cdata = mpy(rdata, offset_prslocal, 1024.0);
-            self.complex_vis.update_complex(&cdata);
+            // self.complex_vis.update_complex(&cdata);
             let mdata = fft(&cdata);
             let magdata = mag(&mdata);
-            self.magnitude_vis.update_mag(&magdata);
+            // self.magnitude_vis.update_mag(&magdata);
 
             let (mut max, indx) = maxext(&magdata);
             let vmean = mean(&magdata);
@@ -248,6 +244,8 @@ impl PhaseReferenceSynchroniser {
 
         let w1: i16 = (ir * 81.66400146484375) as i32 as i16;
         let w2: i16 = (ir * 1.024) as i32 as i16;
+
+        dbg!(w1, w2);
 
         let mut symstr: [u8; 10] = [0; 10];
 

@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap, fmt, time::SystemTime};
 
 use super::{WF_REQ_SLMEM, WF_REQ_TIMING, WF_REQ_TUNE};
 
@@ -19,6 +19,7 @@ pub struct Message {
     pub bytes: Box<[u8]>,
     pub size: usize,
     pub async_: bool,
+    pub time: SystemTime,
 }
 
 impl fmt::Debug for Message {
@@ -70,6 +71,7 @@ pub fn tune_msg(reg: u32, bits: u8, pll: u8, lband: bool) -> Message {
         bytes: Box::from(tbuf),
         size: tbuf.len(),
         async_: false,
+        time: SystemTime::now(),
     }
 }
 
@@ -81,6 +83,7 @@ pub fn slmem_msg(value: u32, index: u32, buffer: &Vec<u8>) -> Message {
         bytes: Box::from(buffer.as_slice()),
         size: buffer.len(),
         async_: false,
+        time: SystemTime::now(),
     }
 }
 
@@ -99,6 +102,7 @@ pub fn timing_msg(buffer: &[u8; 32]) -> Message {
         bytes: Box::from(buffer.as_slice()),
         size: 32,
         async_: false,
+        time: SystemTime::now(),
     }
 }
 
@@ -110,6 +114,7 @@ pub fn r2_msg() -> Message {
         bytes: Box::from([0; 64]),
         size: 64,
         async_: false,
+        time: SystemTime::now(),
     }
 }
 
@@ -121,5 +126,6 @@ pub fn r1_msg() -> Message {
         bytes: Box::from([0; 64]),
         size: 64,
         async_: false,
+        time: SystemTime::now(),
     }
 }

@@ -97,6 +97,7 @@ impl Wavefinder {
     }
 
     pub fn send_ctrl_message(&self, message: &Message) -> usize {
+        // println!("{:?} {:?}", message, SystemTime::now().duration_since(message.time));
         let ptr = Box::into_raw(message.bytes.clone()) as *mut u8;
         unsafe {
             let req: *mut wf_ctrl_request = wf_ctrl_request_init(
