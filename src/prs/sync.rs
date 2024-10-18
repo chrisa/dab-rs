@@ -86,14 +86,21 @@ impl PhaseReferenceSynchroniser {
         let (c, prs2_offset) = self.calc_c(&rdata);
         let ir = self.calc_ir(prs2_offset, &prs.vector());
 
-        if (c.abs() < (2.4609375e-4 / 2.0)) && (ir.abs() < 3500.0) {
+        dbg!(c, ir);
+
+        //	if ((fabs(c) < (2.4609375e-4/2)) && (fabs(ir) < 350)) {
+
+        if (c.abs() < (2.4609375e-4 / 2.0)) && (ir.abs() < 350.0) {
             if self.lock_count == 0 {
+                dbg!("locked");
                 self.lock = true;
             } else {
+                dbg!("NOT locked");
                 self.lock_count -= 1;
                 self.lock = false;
             }
         } else {
+            dbg!("UN locked");
             self.lock_count = 3;
             self.lock = false;
         }
