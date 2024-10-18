@@ -16,8 +16,8 @@ use crate::wavefinder::Message;
 use std::time::{Duration, SystemTime};
 
 pub struct PhaseReferenceSynchroniser {
-    complex_vis: Visualiser,
-    magnitude_vis: Visualiser,
+    // complex_vis: Visualiser,
+    // magnitude_vis: Visualiser,
     prs1: PhaseReferenceArray,
     prs2: PhaseReferenceArray,
     lock: bool,
@@ -31,23 +31,23 @@ pub struct PhaseReferenceSynchroniser {
 }
 
 pub fn new_synchroniser() -> PhaseReferenceSynchroniser {
-    let complex_vis: Visualiser = visualiser::create_visualiser(
-        "PRS ifft",
-        400,
-        400,
-        -80000.0..80000.0,
-        -80000.0..80000.0,
-        "real",
-        "imag",
-    );
+    // let complex_vis: Visualiser = visualiser::create_visualiser(
+    //     "PRS ifft",
+    //     400,
+    //     400,
+    //     -80000.0..80000.0,
+    //     -80000.0..80000.0,
+    //     "real",
+    //     "imag",
+    // );
 
-    let magnitude_vis: Visualiser =
-        visualiser::create_visualiser("PRS mag", 200, 400, 0.0..2048.0, 0.0..2000.0, "freq", "mag");
+    // let magnitude_vis: Visualiser =
+    //     visualiser::create_visualiser("PRS mag", 200, 400, 0.0..2048.0, 0.0..2000.0, "freq", "mag");
 
     let (prs1, prs2) = prs_reference_1_2();
     PhaseReferenceSynchroniser {
-        complex_vis,
-        magnitude_vis,
+        // complex_vis,
+        // magnitude_vis,
         prs1,
         prs2,
         lock: false,
@@ -244,8 +244,6 @@ impl PhaseReferenceSynchroniser {
 
         let w1: i16 = (ir * 81.66400146484375) as i32 as i16;
         let w2: i16 = (ir * 1.024) as i32 as i16;
-
-        dbg!(w1, w2);
 
         let mut symstr: [u8; 10] = [0; 10];
 

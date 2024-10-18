@@ -32,6 +32,13 @@ pub fn run(path: Option<PathBuf>) {
         }
     });
 
+    thread::spawn(move || {
+        let mut fic = fic::new_decoder();
+        while let Ok(buffer) = fic_rx.recv() {
+            fic.try_buffer(buffer);
+        }
+    });
+
     if file_output {
         thread::spawn(move || {
             if let Some(p) = path {
