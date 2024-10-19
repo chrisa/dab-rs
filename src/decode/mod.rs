@@ -23,17 +23,17 @@ pub fn bytes_to_bits(bytes: &[u8; 384]) -> [u8; 3072] {
     bits
 }
 
-pub fn bits_to_bytes(bits: &[u8; 256]) -> [u8; 32] {
+pub fn bits_to_bytes(bits: &[u8; 256]) -> [u8; 30] {
     let mut i = 0;
     let mut j = 0;
-    let mut result: [u8; 32] = [0; 32];
+    let mut result: [u8; 30] = [0; 30];
     loop {
         result[j] = (bits[i]<<7) + (bits[i+1]<<6) + (bits[i+2]<<5) + (bits[i+3]<<4) +       //be
         (bits[i+4]<<3) + (bits[i+5]<<2) + (bits[i+6]<<1) + bits[i+7];
 
         j += 1;
         i += 8;
-        if i >= 256 {
+        if i >= 240 {
             break;
         }
     }

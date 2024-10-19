@@ -8,7 +8,7 @@ use crate::{
     fic::new_frame,
 };
 
-use super::{FastInformationChannelBuffer, FastInformationChannelFrame};
+use super::{FastInformationBlock, FastInformationChannelBuffer, FastInformationChannelFrame};
 
 pub struct FastInformationChannelDecoder {
     frames: Box<[Option<FastInformationChannelFrame>; 32]>,
@@ -41,20 +41,8 @@ impl fmt::Debug for FastInformationChannelDecoder {
     }
 }
 
-fn dump_ascii(bytes: &[char], name: &str) {
-    print!("{:?} = ", name);
-    for byte in bytes {
-        if *byte > 0x20 as char && *byte < 0x80 as char {
-            print!("{}", byte);
-        } else {
-            print!(" ");
-        }
-    }
-    println!();
-}
-
 impl FastInformationChannelDecoder {
-    pub fn try_buffer(&mut self, buffer: FastInformationChannelBuffer) {
+    pub fn try_buffer(&mut self, buffer: FastInformationChannelBuffer) -> Option<Vec<FastInformationBlock>> {
         let mut frame;
 
         if let Some(f) = self.frames[buffer.frame as usize] {
@@ -66,7 +54,7 @@ impl FastInformationChannelDecoder {
                 "can't handle frame {:?} symbol {:?} right now",
                 buffer.frame, buffer.symbol
             );
-            return;
+            return None;
         }
 
         if frame.next_symbol == buffer.symbol {
@@ -74,10 +62,20 @@ impl FastInformationChannelDecoder {
             self.frames[buffer.frame as usize] = Some(frame);
         }
 
-        if frame.next_symbol > 4 && !self.decode_and_crc(&frame) {
-            println!("oh no frame {:?} failed crc, deleting", frame.frame_number);
-            self.frames[frame.frame_number as usize] = None;
+        if frame.next_symbol > 4 {
+            if let Ok(blocks) = self.decode_and_crc(&frame) {
+                dbg!(&blocks);
+                return Some(blocks);
+            }
+            else {
+                // CRC check failed
+                self.frames[frame.frame_number as usize] = None;
+                return None;
+            }
         }
+        
+        // Not enough symbols yet
+        None
     }
 
     fn append_data(
@@ -90,7 +88,7 @@ impl FastInformationChannelDecoder {
         frame.next_symbol = buffer.symbol + 1;
     }
 
-    fn decode_and_crc(&self, frame: &FastInformationChannelFrame) -> bool {
+    fn decode_and_crc(&self, frame: &FastInformationChannelFrame) -> Result<Vec<FastInformationBlock>, &'static str> {
         let mut merged: [u8; 9216] = [0u8; 9216];
 
         for (i, sym) in frame.bytes.iter().enumerate() {
@@ -115,19 +113,20 @@ impl FastInformationChannelDecoder {
             }
         }
 
-        let mut fib_chars: [[char; 32]; 12] = [[0 as char; 32]; 12];
+        let mut fib_chars: [[char; 30]; 12] = [[0 as char; 30]; 12];
+
         for i in 0..12 {
             // Check CRC
             if !crc16(&fibs[i]) {
-                return false;
+                return Err("crc check failed");
             }
 
             // If OK, convert to bytes
             let bytes = bits_to_bytes(&fibs[i]);
             fib_chars[i].copy_from_slice(&bytes.map(char::from));
-            dump_ascii(&fib_chars[i], format!("fib #{}", i).as_str());
         }
 
-        true
+        let blocks = fib_chars.map(|chars| FastInformationBlock { chars, num: frame.frame_number }).to_vec();
+        Ok(blocks)
     }
 }

@@ -69,3 +69,24 @@ pub fn new_frame(frame_number: u8) -> FastInformationChannelFrame {
         bytes: [[0; FIC_BUFFER]; 3],
     }
 }
+
+#[derive(Copy, Clone)]
+pub struct FastInformationBlock {
+    num: u8,
+    chars: [char; 30],
+}
+
+impl fmt::Debug for FastInformationBlock {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = String::new();
+        s.push_str(format!("{:?} = ", self.num).as_str());
+        for char in self.chars {
+            if char > 0x20 as char && char < 0x80 as char {
+                s.push(char);
+            } else {
+                s.push(' ');
+            }
+        }
+        write!(f, "{}", s)
+    }
+}
