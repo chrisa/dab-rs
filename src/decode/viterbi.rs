@@ -199,7 +199,7 @@ impl Viterbi {
             }
 
             symbol_offset += N as usize;
-          
+
             /* Run the add-compare-select operations */
             let mut i = 0;
             loop {

@@ -57,7 +57,7 @@ impl fmt::Debug for FastInformationChannelFrame {
                 s.push_str(format!("{:02x} ", buffer[i]).as_str());
             }
         }
-        s.push_str("\n");
+        s.push('\n');
         write!(f, "{}", s)
     }
 }

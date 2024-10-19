@@ -28,9 +28,8 @@ pub fn bits_to_bytes(bits: &[u8; 256]) -> [u8; 32] {
     let mut j = 0;
     let mut result: [u8; 32] = [0; 32];
     loop {
-
-        result[j] = (bits[i+0]<<7) + (bits[i+1]<<6) + (bits[i+2]<<5) + (bits[i+3]<<4) +       //be
-        (bits[i+4]<<3) + (bits[i+5]<<2) + (bits[i+6]<<1) + (bits[i+7]<<0);
+        result[j] = (bits[i]<<7) + (bits[i+1]<<6) + (bits[i+2]<<5) + (bits[i+3]<<4) +       //be
+        (bits[i+4]<<3) + (bits[i+5]<<2) + (bits[i+6]<<1) + bits[i+7];
 
         j += 1;
         i += 8;
@@ -170,8 +169,7 @@ pub fn scramble(bits: [u8; 768]) -> [u8; 768] {
         let v0 = ((v >> 9) & 1) ^ ((v >> 5) & 1);
         v |= v0;
 
-        result[i] = bits[i] ^ v0 as u8; // discards bits?
-        // println!("v: {:?} v0: {:?} bits[i]: {:?} result[i]: {:?}", v, v0, bits[i], result[i]);
+        result[i] = bits[i] ^ v0 as u8;
     }
 
     result

@@ -50,7 +50,7 @@ fn dump_ascii(bytes: &[char], name: &str) {
             print!(" ");
         }
     }
-    println!("");
+    println!();
 }
 
 impl FastInformationChannelDecoder {
@@ -74,11 +74,9 @@ impl FastInformationChannelDecoder {
             self.frames[buffer.frame as usize] = Some(frame);
         }
 
-        if frame.next_symbol > 4 {
-            if !self.decode_and_crc(&mut frame) {
-                println!("oh no frame {:?} failed crc, deleting", frame.frame_number);
-                self.frames[frame.frame_number as usize] = None;
-            }
+        if frame.next_symbol > 4 && !self.decode_and_crc(&mut frame) {
+            println!("oh no frame {:?} failed crc, deleting", frame.frame_number);
+            self.frames[frame.frame_number as usize] = None;
         }
     }
 
