@@ -66,8 +66,8 @@ impl Viterbi {
     fn vd_init(&mut self) {
         for i in 0..(1 << K as usize) {
             let mut sym = 0;
-            for j in 0..N as usize {
-                sym = (sym << 1) + parity(i & Polys[j]);
+            for p in Polys {
+                sym = (sym << 1) + parity(i & p);
                 self.syms[i] = sym;
             }
         }
@@ -104,9 +104,9 @@ impl Viterbi {
             metrics[1][255] = (2.0 * p1 / (p1 + p0)).log2() - bias;
         }
 
-        for bit in 0..2 {
-            for s in 0..256 {
-                self.metrics[bit][s] = match (metrics[bit][s] * scale + 0.5).floor() {
+        for (i, bit) in metrics.iter().enumerate() {
+            for (j, s) in bit.iter().enumerate() {
+                self.metrics[i][j] = match (s * scale + 0.5).floor() {
                     x if x.is_nan() => i32::MIN,
                     f64::NEG_INFINITY => i32::MIN,
                     other => other as i32,
@@ -124,9 +124,9 @@ impl Viterbi {
         }
 
         let mut n = 0;
-        for i in 0..2048 {
-            if (KI[i] >= 256) && (KI[i] <= 1792) && (KI[i] != 1024) {
-                self.table49[n] = KI[i] - 1024;
+        for k in KI {
+            if (256..=1792).contains(&k) && (k != 1024) {
+                self.table49[n] = k - 1024;
                 n += 1;
             }
         }
@@ -179,8 +179,8 @@ impl Viterbi {
         endstate &= !((1 << (K - 1)) - 1);
 
         /* Initialize starting metrics */
-        for i in 0..(1 << (K - 1)) {
-            cmetric[i] = -999999;
+        for c in cmetric.iter_mut().take(1 << (K - 1)) {
+            *c = -999999;
         }
         cmetric[startstate] = 0;
 
@@ -190,10 +190,10 @@ impl Viterbi {
         loop {
             /* For each data bit */
             /* Read input symbols and compute branch metrics */
-            for i in 0..(1 << N) {
-                mets[i] = 0;
+            for (i, met) in mets.iter_mut().enumerate().take(1 << N) {
+                *met = 0;
                 for j in 0..N as usize {
-                    mets[i] += self.metrics[(i >> (N as usize - j - 1)) & 1]
+                    *met += self.metrics[(i >> (N as usize - j - 1)) & 1]
                         [symbols[symbol_offset + j]] as i32;
                 }
             }

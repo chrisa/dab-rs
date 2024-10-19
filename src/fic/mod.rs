@@ -53,8 +53,8 @@ impl fmt::Debug for FastInformationChannelFrame {
                 )
                 .as_str(),
             );
-            for i in 0..FIC_BUFFER {
-                s.push_str(format!("{:02x} ", buffer[i]).as_str());
+            for byte in buffer.iter().take(FIC_BUFFER) {
+                s.push_str(format!("{:02x} ", byte).as_str());
             }
         }
         s.push('\n');

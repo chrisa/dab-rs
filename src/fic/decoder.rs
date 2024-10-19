@@ -43,9 +43,9 @@ impl fmt::Debug for FastInformationChannelDecoder {
 
 fn dump_ascii(bytes: &[char], name: &str) {
     print!("{:?} = ", name);
-    for i in 0..32 {
-        if bytes[i] > 0x20 as char && bytes[i] < 0x80 as char {
-            print!("{}", bytes[i]);
+    for byte in bytes {
+        if *byte > 0x20 as char && *byte < 0x80 as char {
+            print!("{}", byte);
         } else {
             print!(" ");
         }
@@ -74,7 +74,7 @@ impl FastInformationChannelDecoder {
             self.frames[buffer.frame as usize] = Some(frame);
         }
 
-        if frame.next_symbol > 4 && !self.decode_and_crc(&mut frame) {
+        if frame.next_symbol > 4 && !self.decode_and_crc(&frame) {
             println!("oh no frame {:?} failed crc, deleting", frame.frame_number);
             self.frames[frame.frame_number as usize] = None;
         }
@@ -124,9 +124,7 @@ impl FastInformationChannelDecoder {
 
             // If OK, convert to bytes
             let bytes = bits_to_bytes(&fibs[i]);
-            for j in 0..32 {
-                fib_chars[i][j] = bytes[j] as char;
-            }
+            fib_chars[i].copy_from_slice(&bytes.map(char::from));
             dump_ascii(&fib_chars[i], format!("fib #{}", i).as_str());
         }
 

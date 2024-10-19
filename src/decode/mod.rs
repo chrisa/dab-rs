@@ -181,8 +181,8 @@ const CRC_GOOD: u32 = 0xf0b8;
 pub fn crc16(bits: &[u8; 256]) -> bool {
     let mut crc = 0xffff;
 
-    for i in 0..256 {
-        let c15 = (crc & 1) ^ (bits[i] & 1) as u32;
+    for bit in bits {
+        let c15 = (crc & 1) ^ (bit & 1) as u32;
         crc >>= 1;
         if c15 == 1 {
             crc ^= CRC_POLY;
