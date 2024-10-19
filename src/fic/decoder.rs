@@ -102,40 +102,24 @@ impl FastInformationChannelDecoder {
         }
 
         let mut split = [0u8; 2304];
-        let mut fics: [[u8; 768]; 4] = [[0; 768]; 4];
+        let mut fibs: [[u8; 256]; 12] = [[0; 256]; 12];
 
         for i in 0..4 {
             split.copy_from_slice(&merged[(i * 2304)..((i + 1) * 2304)]);
             let depunctured = depuncture(split);
             let viterbied = self.viterbi.viterbi(depunctured);
             let scrambled = scramble(viterbied);
-            fics[i].copy_from_slice(&scrambled);
-        }
-
-        let mut fibs: [[u8; 256]; 12] = [[0; 256]; 12];
-        for i in 0..256 {
-            fibs[0][i] = fics[0][i];
-            fibs[1][i] = fics[0][256 + i];
-            fibs[2][i] = fics[0][512 + i];
-
-            fibs[3][i] = fics[1][i];
-            fibs[4][i] = fics[1][256 + i];
-            fibs[5][i] = fics[1][512 + i];
-
-            fibs[6][i] = fics[2][i];
-            fibs[7][i] = fics[2][256 + i];
-            fibs[8][i] = fics[2][512 + i];
-
-            fibs[9][i] = fics[3][i];
-            fibs[10][i] = fics[3][256 + i];
-            fibs[11][i] = fics[3][512 + i];
+            // Split into FIBs
+            for j in 0..3 {
+                fibs[i * 3 + j].copy_from_slice(&scrambled[(j * 256)..(j * 256 + 256)]);
+            }
         }
 
         let mut fib_chars: [[char; 32]; 12] = [[0 as char; 32]; 12];
         for i in 0..12 {
             // Check CRC
             if !crc16(&fibs[i]) {
-                continue;
+                return false;
             }
 
             // If OK, convert to bytes
