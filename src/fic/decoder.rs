@@ -41,14 +41,6 @@ impl fmt::Debug for FastInformationChannelDecoder {
     }
 }
 
-fn dump_bin_array(bits: &[u8], name: &str) {
-    println!("{}", name);
-    for bit in bits {
-        print!("{:?}", bit);
-    }
-    println!("");
-}
-
 fn dump_ascii(bytes: &[char], name: &str) {
     print!("{:?} = ", name);
     for i in 0..32 {
@@ -88,8 +80,6 @@ impl FastInformationChannelDecoder {
                 self.frames[frame.frame_number as usize] = None;
             }
         }
-
-        // dbg!(self);
     }
 
     fn append_data(
@@ -105,21 +95,13 @@ impl FastInformationChannelDecoder {
     fn decode_and_crc(&self, frame: &FastInformationChannelFrame) -> bool {
         let mut merged: [u8; 9216] = [0u8; 9216];
 
-        // dbg!(frame);
-
         for (i, sym) in frame.bytes.iter().enumerate() {
             let mut bits = bytes_to_bits(sym);
-            // dump_bin_array(&bits, "bits");
             bit_reverse(&mut bits);
-            // dump_bin_array(&bits, "revd");
             let bits = self.viterbi.frequency_deinterleave(bits);
-            // dump_bin_array(&bits, "deinterleaved");
             let bits = qpsk_symbol_demapper(bits);
-            // dump_bin_array(&bits, "qpsk_demapped");
             merged[(i * 3072)..((i + 1) * 3072)].copy_from_slice(&bits);
         }
-
-        // dump_bin_array(&merged, "merged");
 
         let mut split = [0u8; 2304];
         let mut fics: [[u8; 768]; 4] = [[0; 768]; 4];
@@ -127,11 +109,8 @@ impl FastInformationChannelDecoder {
         for i in 0..4 {
             split.copy_from_slice(&merged[(i * 2304)..((i + 1) * 2304)]);
             let depunctured = depuncture(split);
-            // dump_bin_array(&depunctured, "depunctured");
             let viterbied = self.viterbi.viterbi(depunctured);
-            // dump_bin_array(&viterbied, "viterbied");
             let scrambled = scramble(viterbied);
-            // dump_bin_array(&scrambled, "scrambled");
             fics[i].copy_from_slice(&scrambled);
         }
 
@@ -168,8 +147,6 @@ impl FastInformationChannelDecoder {
             }
             dump_ascii(&fib_chars[i], format!("fib #{}", i).as_str());
         }
-
-        // dbg!(fib_chars);
 
         true
     }

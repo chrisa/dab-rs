@@ -61,23 +61,16 @@ const Partab: [usize; 256] = [
 
 /* Rate 1/4 codes */
 const Polys: [usize; 4] = [0x6d, 0x4f, 0x53, 0x6d]; /* k = 7; DAB  */
-//<=== bit rev of 5b 79 65 5b
 
 impl Viterbi {
     fn vd_init(&mut self) {
-        // for i in 0..(1 << K as usize) {
-        //     let mut sym = 0;
-        //     for j in 0..N as usize {
-        //         sym = (sym << 1) + parity(i & Polys[j]);
-        //         self.syms[i] = sym;
-        //     }
-        // }
-
-        self.syms = Box::new([
-            0, 15, 6, 9, 13, 2, 11, 4, 13, 2, 11, 4, 0, 15, 6, 9, 2, 13, 4, 11, 15, 0, 9, 6, 15, 0, 9, 6, 2, 13, 4, 11, 9, 6, 15, 0, 4, 11, 2, 13, 4, 11, 2, 13, 9, 6, 15, 0, 11, 4, 13, 2, 6, 9, 0, 15, 6, 9, 0, 15, 11, 4, 13, 2, 15, 0, 9, 6, 2, 13, 4, 11, 2, 13, 4, 11, 15, 0, 9, 6, 13, 2, 11, 4, 0, 15, 6, 9, 0, 15, 6, 9, 13, 2, 11, 4, 6, 9, 0, 15, 11, 4, 13, 2, 11, 4, 13, 2, 6, 9, 0, 15, 4, 11, 2, 13, 9, 6, 15, 0, 9, 6, 15, 0, 4, 11, 2, 13
-        ]);
-
-        //, dbg!(&self.syms);
+        for i in 0..(1 << K as usize) {
+            let mut sym = 0;
+            for j in 0..N as usize {
+                sym = (sym << 1) + parity(i & Polys[j]);
+                self.syms[i] = sym;
+            }
+        }
     }
 
     fn gen_metrics(&mut self) {
@@ -120,8 +113,6 @@ impl Viterbi {
                 };
             }
         }
-
-        // dbg!(&self.metrics);
     }
 
     fn gen_table49(&mut self) {
@@ -139,8 +130,6 @@ impl Viterbi {
                 n += 1;
             }
         }
-
-        // dbg!(&self.table49);
     }
 
     pub fn frequency_deinterleave(&self, bits: [u8; 3072]) -> [u8; 3072] {
@@ -154,10 +143,8 @@ impl Viterbi {
                 n if n > 0 => k1 / 2 - 1,
                 _ => 0,
             };
-            // dbg!(k);
             assert!(k >= 0);
             assert!(k < 1536);
-            // now, 0x0 <= k < 1536 (?)
 
             slice[2 * i as usize] = bits[2 * k as usize];
             slice[2 * i as usize + 1] = bits[2 * k as usize + 1];
@@ -169,8 +156,6 @@ impl Viterbi {
     pub fn viterbi(&self, bits: [u8; 3096]) -> [u8; 768] {
         let mut result = [0u8; 768];
         let symbols = bits.map(map_symbol);
-
-        // dbg!(symbols);
 
         let mut bitcnt = -(K - 1);
 
@@ -193,9 +178,6 @@ impl Viterbi {
         startstate &= !((1 << (K - 1)) - 1);
         endstate &= !((1 << (K - 1)) - 1);
 
-        // dbg!(bitcnt);
-        // dbg!(nbits);
-
         /* Initialize starting metrics */
         for i in 0..(1 << (K - 1)) {
             cmetric[i] = -999999;
@@ -216,13 +198,8 @@ impl Viterbi {
                 }
             }
 
-            // dbg!(mets);
-
             symbol_offset += N as usize;
           
-        //   dbg!(mets);
-        //   dbg!(&self.syms);
-
             /* Run the add-compare-select operations */
             let mut i = 0;
             loop {
@@ -230,7 +207,6 @@ impl Viterbi {
                 nmetric[i] = cmetric[i / 2] + b1;
                 m0 = cmetric[i / 2] + b1;
                 let b2 = mets[self.syms[i + 1]];
-                // print!("b {} {} ", b1, b2);
                 b1 -= b2;
                 m1 = cmetric[(i / 2) + (1 << (K - 2))] + b2;
                 if m1 > m0 {
@@ -249,14 +225,12 @@ impl Viterbi {
                     mask = 1;
                     path_offset += 1;
                 }
-                // print!("{:?} ", path_offset);
 
                 i += 2;
                 if i >= (1 << (K - 1)) {
                     break;
                 }
             }
-            // println!("");
 
             if mask != 1 {
                 path_offset += 1;
@@ -268,21 +242,9 @@ impl Viterbi {
             cmetric.copy_from_slice(&nmetric);
         }
 
-        // dbg!(cmetric);
-
-        // dbg!(nbits);
-        // dbg!(paths);
-        // dbg!(path_offset);
-        // dbg!(D);
-
         /* Chain back from terminal state to produce decoded data */
         for i in (0..(nbits as usize)).rev() {
             path_offset -= D as usize;
-
-            // dbg!(path_offset);
-            // dbg!(endstate);
-            // dbg!(paths[path_offset + (endstate >> LOGLONGBITS)]);
-            // dbg!(1u64 << (endstate & (LONGBITS as usize - 1)));
 
             if (paths[path_offset + (endstate >> LOGLONGBITS)]
                 & (1u32 << (endstate & (LONGBITS as usize - 1))))
@@ -292,8 +254,6 @@ impl Viterbi {
                 result[i] = 1;
             }
             endstate >>= 1;
-
-            // dbg!(endstate);
         }
 
         result
