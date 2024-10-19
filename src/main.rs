@@ -5,9 +5,8 @@
 mod decode;
 mod fic;
 mod prs;
-mod visualiser;
-mod wavefinder;
 mod source;
+mod wavefinder;
 
 use clap::Parser;
 
@@ -28,6 +27,6 @@ fn main() {
     let args = Cli::parse();
     match args.source {
         Source::Wavefinder => source::wavefinder::run(args.file),
-        Source::File       => source::file::run(args.file)
+        Source::File => source::file::run(args.file),
     }
 }

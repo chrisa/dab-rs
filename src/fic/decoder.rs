@@ -1,11 +1,11 @@
 use std::fmt;
 
 use crate::{
-    decode::{bit_reverse, byte_to_bit, new_viterbi, Fic, Fic2304, Viterbi},
+    decode::{bit_reverse, bits_to_bytes, bytes_to_bits, depuncture, new_viterbi, qpsk_symbol_demapper, scramble, crc16, Viterbi},
     fic::new_frame,
 };
 
-use super::{FastInformationChannelBuffer, FastInformationChannelFrame, FIC_BUFFER};
+use super::{FastInformationChannelBuffer, FastInformationChannelFrame};
 
 pub struct FastInformationChannelDecoder {
     frames: Box<[Option<FastInformationChannelFrame>; 32]>,
@@ -29,7 +29,7 @@ impl fmt::Debug for FastInformationChannelDecoder {
                     3 => format!("{:?}[2] ", frame.frame_number),
                     4 => format!("{:?}[23] ", frame.frame_number),
                     5 => format!("{:?}[234] ", frame.frame_number),
-                    _ => format!("wut?"),
+                    _ => "wut?".to_string(),
                 };
                 s.push_str(&frame_string);
             }
@@ -77,28 +77,63 @@ impl FastInformationChannelDecoder {
         frame.next_symbol = buffer.symbol + 1;
     }
 
-    fn decode_and_crc(&self, mut frame: &FastInformationChannelFrame) -> bool {
-        let syms = frame.bytes.map(byte_to_bit);
-        for mut sym in syms {
-            bit_reverse(&mut sym);
-            self.viterbi.frequency_deinterleave(&mut sym);
-            self.viterbi.qpsk_symbol_demapper(&mut sym);
+    fn decode_and_crc(&self, frame: &FastInformationChannelFrame) -> bool {
+        let mut merged: [u8; 9216] = [0u8; 9216];
+
+        for (i, sym) in frame.bytes.iter().enumerate() {
+            let mut bits = bytes_to_bits(sym);
+            bit_reverse(&mut bits);
+            let bits = self.viterbi.frequency_deinterleave(bits);
+            let bits = qpsk_symbol_demapper(bits);
+            merged[(i * 3072)..((i + 1) * 3072)].copy_from_slice(&bits);
         }
 
-        let mut merged: Fic = [0u8; 1152].into();
-        for i in 0..3 {
-            merged[(i * 3072)..((i + 1) * 3072)].copy_from_bitslice(&syms[i]);
-        }
+        let mut split = [0u8; 2304];
+        let mut fics: [[u8; 768]; 4] = [[0; 768]; 4];
 
-        let mut split: Fic2304= [0u8; 288].into();
         for i in 0..4 {
-            split.copy_from_bitslice(&merged[(i * 2304)..((i + 1) * 2304)]);
-            // let depunctured = self.viterbi.depuncture(&split);
-            // let viterbied = self.viterbi.viterbi(&depunctured);
+            split.copy_from_slice(&merged[(i * 2304)..((i + 1) * 2304)]);
+            let depunctured = depuncture(split);
+            let viterbied = self.viterbi.viterbi(depunctured);
+            let scrambled = scramble(viterbied);
+            fics[i].copy_from_slice(&scrambled);
         }
 
+        let mut fibs: [[u8; 256]; 12] = [[0; 256]; 12];
+        for i in 0..256 {
+            fibs[0][i] = fics[0][    i];
+            fibs[1][i] = fics[0][256+i];
+            fibs[2][i] = fics[0][512+i];
         
+            fibs[3][i] = fics[1][    i];
+            fibs[4][i] = fics[1][256+i];
+            fibs[5][i] = fics[1][512+i];
         
+            fibs[6][i] = fics[2][    i];
+            fibs[7][i] = fics[2][256+i];
+            fibs[8][i] = fics[2][512+i];
+        
+            fibs[9][i] = fics[3][    i];
+            fibs[10][i] = fics[3][256+i];
+            fibs[11][i] = fics[3][512+i];
+        }
+
+        let mut fib_chars: [[char; 32]; 12] = [[0 as char; 32]; 12];
+        for i in 0..12 {
+            // Check CRC
+            if !crc16(&fibs[i]) {
+                continue;
+            }
+
+            // If OK, convert to bytes
+            let bytes = bits_to_bytes(&fibs[i]);
+            for j in 0..32 {
+                fib_chars[i][j] = bytes[j] as char;
+            }
+        }
+    
+        dbg!(fib_chars);
+
         true
     }
 }

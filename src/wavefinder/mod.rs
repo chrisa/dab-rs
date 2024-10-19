@@ -8,7 +8,12 @@ mod bindings {
 pub use bindings::*;
 pub use message::*;
 
-use std::{fs::File, io::{BufReader, BufWriter, Read, Write}, thread, time::Duration};
+use std::{
+    fs::File,
+    io::{BufReader, BufWriter, Read, Write},
+    thread,
+    time::Duration,
+};
 
 #[derive(Debug)]
 pub struct Wavefinder {
@@ -21,7 +26,6 @@ pub struct Buffer {
 }
 
 impl Buffer {
-
     pub fn write_to_file(self, buf: &mut BufWriter<File>) {
         buf.write_all(&self.bytes).expect("failed to write to file");
     }

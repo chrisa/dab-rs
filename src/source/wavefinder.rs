@@ -1,14 +1,14 @@
 use fic::FastInformationChannelBuffer;
 use std::cell::RefCell;
+use std::fs::File;
+use std::io::BufWriter;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
 use std::thread;
-use std::io::BufWriter;
-use std::fs::File;
 
-use crate::{fic, wavefinder, prs};
 use crate::wavefinder::{Buffer, Wavefinder};
+use crate::{fic, prs, wavefinder};
 
 static LOCKED: AtomicBool = AtomicBool::new(false);
 
@@ -56,7 +56,6 @@ pub fn run(path: Option<PathBuf>) {
                 }
             }
         });
-
     }
 
     let cb = move |buffer: Buffer| {

@@ -1,6 +1,9 @@
 use std::{fs::File, io::BufReader, path::PathBuf};
 
-use crate::{fic::{self, FastInformationChannelBuffer}, wavefinder::Buffer};
+use crate::{
+    fic::{self, FastInformationChannelBuffer},
+    wavefinder::Buffer,
+};
 
 pub fn run(path: Option<PathBuf>) {
     let mut buf;
@@ -8,12 +11,10 @@ pub fn run(path: Option<PathBuf>) {
         let file = File::open(&p);
         if let Ok(f) = file {
             buf = BufReader::new(f);
-        }
-        else {
+        } else {
             panic!("file couldn't be opened {:?}", p);
         }
-    }
-    else {
+    } else {
         panic!("no file specified");
     }
 

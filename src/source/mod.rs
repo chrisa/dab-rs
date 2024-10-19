@@ -1,2 +1,2 @@
-pub mod wavefinder;
 pub mod file;
+pub mod wavefinder;

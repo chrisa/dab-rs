@@ -7,8 +7,6 @@ use crate::prs::reference::prs_reference_1_2;
 use crate::prs::PhaseReferenceArray;
 use crate::prs::PhaseReferenceSymbol;
 use crate::prs::PRS_POINTS;
-use crate::visualiser;
-use crate::visualiser::Visualiser;
 use crate::wavefinder::mem_write_msg;
 use crate::wavefinder::timing_msg;
 use crate::wavefinder::Message;
@@ -18,8 +16,6 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, SystemTime};
 
 pub struct PhaseReferenceSynchroniser {
-    // complex_vis: Visualiser,
-    // magnitude_vis: Visualiser,
     prs1: PhaseReferenceArray,
     prs2: PhaseReferenceArray,
     lock_count: u8,
@@ -33,23 +29,8 @@ pub struct PhaseReferenceSynchroniser {
 }
 
 pub fn new_synchroniser(LOCKED: &'static AtomicBool) -> PhaseReferenceSynchroniser {
-    // let complex_vis: Visualiser = visualiser::create_visualiser(
-    //     "PRS ifft",
-    //     400,
-    //     400,
-    //     -80000.0..80000.0,
-    //     -80000.0..80000.0,
-    //     "real",
-    //     "imag",
-    // );
-
-    // let magnitude_vis: Visualiser =
-    //     visualiser::create_visualiser("PRS mag", 200, 400, 0.0..2048.0, 0.0..2000.0, "freq", "mag");
-
     let (prs1, prs2) = prs_reference_1_2();
     PhaseReferenceSynchroniser {
-        // complex_vis,
-        // magnitude_vis,
         prs1,
         prs2,
         lock_count: 3,
@@ -83,7 +64,6 @@ fn align_reference_symbol(indx: i32, source: &PhaseReferenceArray) -> [Complex64
 }
 
 impl PhaseReferenceSynchroniser {
-
     fn locked(&self) -> bool {
         self.LOCKED.load(Ordering::Relaxed)
     }
@@ -92,8 +72,7 @@ impl PhaseReferenceSynchroniser {
         if self.lock_count >= 1 {
             self.lock_count -= 1;
             false
-        }
-        else {
+        } else {
             self.lock_count = 0;
             self.LOCKED.store(true, Ordering::Relaxed);
             true
@@ -168,10 +147,8 @@ impl PhaseReferenceSynchroniser {
             let offset_prslocal: &PhaseReferenceArray =
                 &prslocal[i..(PRS_POINTS + i)].try_into().unwrap();
             let cdata = mpy(rdata, offset_prslocal, 1024.0);
-            // self.complex_vis.update_complex(&cdata);
             let mdata = fft(&cdata);
             let magdata = mag(&mdata);
-            // self.magnitude_vis.update_mag(&magdata);
 
             let (mut max, indx) = maxext(&magdata);
             let vmean = mean(&magdata);
@@ -219,9 +196,6 @@ impl PhaseReferenceSynchroniser {
         let rdata = fft(&mdata);
         let magdata = mag(&rdata);
         let (mut max, indx) = maxext(&magdata);
-
-        // self.complex_vis.update_complex(&mdata);
-        // self.magnitude_vis.update_mag(&magdata);
 
         let vmean = mean(&magdata);
         if (vmean * 14.0) > max {
