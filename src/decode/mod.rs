@@ -27,10 +27,10 @@ pub fn bits_to_bytes(bits: &[u8; 256]) -> [u8; 32] {
     let mut i = 0;
     let mut j = 0;
     let mut result: [u8; 32] = [0; 32];
-    loop
-    {
-        result[j] = (bits[i+0]<<0) + (bits[i+1]<<1) + (bits[i+2]<<2) + (bits[i+3]<<3) +       
-                    (bits[i+4]<<4) + (bits[i+5]<<5) + (bits[i+6]<<6) + (bits[i+7]<<7);
+    loop {
+
+        result[j] = (bits[i+0]<<7) + (bits[i+1]<<6) + (bits[i+2]<<5) + (bits[i+3]<<4) +       //be
+        (bits[i+4]<<3) + (bits[i+5]<<2) + (bits[i+6]<<1) + (bits[i+7]<<0);
 
         j += 1;
         i += 8;
@@ -41,7 +41,6 @@ pub fn bits_to_bytes(bits: &[u8; 256]) -> [u8; 32] {
 
     result
 }
-
 
 pub fn qpsk_symbol_demapper(bits: [u8; 3072]) -> [u8; 3072] {
     let mut slice = [0u8; 3072];
@@ -64,7 +63,7 @@ pub fn depuncture(bits: [u8; 2304]) -> [u8; 3096] {
 
     loop {
         for j in 0..8 {
-            result[i + j * 4 + 0] = bits[k + 0];
+            result[i + j * 4] = bits[k];
             result[i + j * 4 + 1] = bits[k + 1];
             result[i + j * 4 + 2] = bits[k + 2];
             result[i + j * 4 + 3] = 8; // mark depunctured bit for soft decision
@@ -80,7 +79,7 @@ pub fn depuncture(bits: [u8; 2304]) -> [u8; 3096] {
     let mut i = 21 * 128;
     loop {
         for j in 0..7 {
-            result[i + j * 4 + 0] = bits[k + 0];
+            result[i + j * 4] = bits[k];
             result[i + j * 4 + 1] = bits[k + 1];
             result[i + j * 4 + 2] = bits[k + 2];
             result[i + j * 4 + 3] = 8;
@@ -88,7 +87,7 @@ pub fn depuncture(bits: [u8; 2304]) -> [u8; 3096] {
         }
 
         let j = 7; // value of j after the loop above (!)
-        result[i + j * 4 + 0] = bits[k + 0];
+        result[i + j * 4] = bits[k];
         result[i + j * 4 + 1] = bits[k + 1];
         result[i + j * 4 + 2] = 8;
         result[i + j * 4 + 3] = 8;
@@ -101,7 +100,7 @@ pub fn depuncture(bits: [u8; 2304]) -> [u8; 3096] {
     }
 
     for j in 0..6 {
-        result[i + j * 4 + 0] = bits[k + 0];
+        result[i + j * 4] = bits[k];
         result[i + j * 4 + 1] = bits[k + 1];
         result[i + j * 4 + 2] = 8;
         result[i + j * 4 + 3] = 8;
@@ -159,7 +158,6 @@ pub fn depuncture(bits: [u8; 2304]) -> [u8; 3096] {
 //     result
 // }
 
-
 //10 Energy dispersal
 //10.1 General procedure
 //10.2 Energy dispersal as applied in the Fast Information Channel
@@ -168,12 +166,12 @@ pub fn scramble(bits: [u8; 768]) -> [u8; 768] {
     let mut result: [u8; 768] = [0; 768];
 
     for i in 0..768 {
-        v = v << 1;
-        let v0= ((v>>9)&1) ^ ((v>>5)&1);
+        v <<= 1;
+        let v0 = ((v >> 9) & 1) ^ ((v >> 5) & 1);
         v |= v0;
 
         result[i] = bits[i] ^ v0 as u8; // discards bits?
-
+        // println!("v: {:?} v0: {:?} bits[i]: {:?} result[i]: {:?}", v, v0, bits[i], result[i]);
     }
 
     result
@@ -185,9 +183,9 @@ const CRC_GOOD: u32 = 0xf0b8;
 pub fn crc16(bits: &[u8; 256]) -> bool {
     let mut crc = 0xffff;
 
-    for i in 0..256 {    
+    for i in 0..256 {
         let c15 = (crc & 1) ^ (bits[i] & 1) as u32;
-        crc = crc >> 1;
+        crc >>= 1;
         if c15 == 1 {
             crc ^= CRC_POLY;
         }

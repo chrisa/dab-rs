@@ -1,3 +1,5 @@
+use core::fmt;
+
 use crate::wavefinder::Buffer;
 
 mod decoder;
@@ -38,6 +40,26 @@ pub struct FastInformationChannelFrame {
     frame_number: u8,
     next_symbol: u8,
     bytes: [[u8; FIC_BUFFER]; 3],
+}
+
+impl fmt::Debug for FastInformationChannelFrame {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = String::new();
+        for (i, buffer) in self.bytes.iter().enumerate() {
+            s.push_str(
+                format!(
+                    "\nframe number: {:?} next symbol: {:?}\n  sym{:?} = ",
+                    self.frame_number, self.next_symbol, i
+                )
+                .as_str(),
+            );
+            for i in 0..FIC_BUFFER {
+                s.push_str(format!("{:02x} ", buffer[i]).as_str());
+            }
+        }
+        s.push_str("\n");
+        write!(f, "{}", s)
+    }
 }
 
 pub fn new_frame(frame_number: u8) -> FastInformationChannelFrame {

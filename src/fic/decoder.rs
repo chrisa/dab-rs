@@ -1,7 +1,10 @@
 use std::fmt;
 
 use crate::{
-    decode::{bit_reverse, bits_to_bytes, bytes_to_bits, depuncture, new_viterbi, qpsk_symbol_demapper, scramble, crc16, Viterbi},
+    decode::{
+        bit_reverse, bits_to_bytes, bytes_to_bits, crc16, depuncture, new_viterbi,
+        qpsk_symbol_demapper, scramble, Viterbi,
+    },
     fic::new_frame,
 };
 
@@ -38,6 +41,26 @@ impl fmt::Debug for FastInformationChannelDecoder {
     }
 }
 
+fn dump_bin_array(bits: &[u8], name: &str) {
+    println!("{}", name);
+    for bit in bits {
+        print!("{:?}", bit);
+    }
+    println!("");
+}
+
+fn dump_ascii(bytes: &[char], name: &str) {
+    print!("{:?} = ", name);
+    for i in 0..32 {
+        if bytes[i] > 0x20 as char && bytes[i] < 0x80 as char {
+            print!("{}", bytes[i]);
+        } else {
+            print!(" ");
+        }
+    }
+    println!("");
+}
+
 impl FastInformationChannelDecoder {
     pub fn try_buffer(&mut self, buffer: FastInformationChannelBuffer) {
         let mut frame;
@@ -59,12 +82,14 @@ impl FastInformationChannelDecoder {
             self.frames[buffer.frame as usize] = Some(frame);
         }
 
-        if !self.decode_and_crc(&mut frame) {
-            println!("oh no frame {:?} failed crc, deleting", frame.frame_number);
-            self.frames[frame.frame_number as usize] = None;
+        if frame.next_symbol > 4 {
+            if !self.decode_and_crc(&mut frame) {
+                println!("oh no frame {:?} failed crc, deleting", frame.frame_number);
+                self.frames[frame.frame_number as usize] = None;
+            }
         }
 
-        dbg!(self);
+        // dbg!(self);
     }
 
     fn append_data(
@@ -80,13 +105,21 @@ impl FastInformationChannelDecoder {
     fn decode_and_crc(&self, frame: &FastInformationChannelFrame) -> bool {
         let mut merged: [u8; 9216] = [0u8; 9216];
 
+        // dbg!(frame);
+
         for (i, sym) in frame.bytes.iter().enumerate() {
             let mut bits = bytes_to_bits(sym);
+            // dump_bin_array(&bits, "bits");
             bit_reverse(&mut bits);
+            // dump_bin_array(&bits, "revd");
             let bits = self.viterbi.frequency_deinterleave(bits);
+            // dump_bin_array(&bits, "deinterleaved");
             let bits = qpsk_symbol_demapper(bits);
+            // dump_bin_array(&bits, "qpsk_demapped");
             merged[(i * 3072)..((i + 1) * 3072)].copy_from_slice(&bits);
         }
+
+        // dump_bin_array(&merged, "merged");
 
         let mut split = [0u8; 2304];
         let mut fics: [[u8; 768]; 4] = [[0; 768]; 4];
@@ -94,28 +127,31 @@ impl FastInformationChannelDecoder {
         for i in 0..4 {
             split.copy_from_slice(&merged[(i * 2304)..((i + 1) * 2304)]);
             let depunctured = depuncture(split);
+            // dump_bin_array(&depunctured, "depunctured");
             let viterbied = self.viterbi.viterbi(depunctured);
+            // dump_bin_array(&viterbied, "viterbied");
             let scrambled = scramble(viterbied);
+            // dump_bin_array(&scrambled, "scrambled");
             fics[i].copy_from_slice(&scrambled);
         }
 
         let mut fibs: [[u8; 256]; 12] = [[0; 256]; 12];
         for i in 0..256 {
-            fibs[0][i] = fics[0][    i];
-            fibs[1][i] = fics[0][256+i];
-            fibs[2][i] = fics[0][512+i];
-        
-            fibs[3][i] = fics[1][    i];
-            fibs[4][i] = fics[1][256+i];
-            fibs[5][i] = fics[1][512+i];
-        
-            fibs[6][i] = fics[2][    i];
-            fibs[7][i] = fics[2][256+i];
-            fibs[8][i] = fics[2][512+i];
-        
-            fibs[9][i] = fics[3][    i];
-            fibs[10][i] = fics[3][256+i];
-            fibs[11][i] = fics[3][512+i];
+            fibs[0][i] = fics[0][i];
+            fibs[1][i] = fics[0][256 + i];
+            fibs[2][i] = fics[0][512 + i];
+
+            fibs[3][i] = fics[1][i];
+            fibs[4][i] = fics[1][256 + i];
+            fibs[5][i] = fics[1][512 + i];
+
+            fibs[6][i] = fics[2][i];
+            fibs[7][i] = fics[2][256 + i];
+            fibs[8][i] = fics[2][512 + i];
+
+            fibs[9][i] = fics[3][i];
+            fibs[10][i] = fics[3][256 + i];
+            fibs[11][i] = fics[3][512 + i];
         }
 
         let mut fib_chars: [[char; 32]; 12] = [[0 as char; 32]; 12];
@@ -130,9 +166,10 @@ impl FastInformationChannelDecoder {
             for j in 0..32 {
                 fib_chars[i][j] = bytes[j] as char;
             }
+            dump_ascii(&fib_chars[i], format!("fib #{}", i).as_str());
         }
-    
-        dbg!(fib_chars);
+
+        // dbg!(fib_chars);
 
         true
     }
