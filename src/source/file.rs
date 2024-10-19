@@ -1,11 +1,13 @@
-use std::{fs::File, io::{BufReader, Read}, path::PathBuf};
+use std::{fs::File, io::BufReader, path::PathBuf};
+
+use crate::{fic::{self, FastInformationChannelBuffer}, wavefinder::Buffer};
 
 pub fn run(path: Option<PathBuf>) {
-    let mut b;
+    let mut buf;
     if let Some(p) = path {
         let file = File::open(&p);
         if let Ok(f) = file {
-            b = BufReader::new(f);
+            buf = BufReader::new(f);
         }
         else {
             panic!("file couldn't be opened {:?}", p);
@@ -15,12 +17,14 @@ pub fn run(path: Option<PathBuf>) {
         panic!("no file specified");
     }
 
+    let mut fic = fic::new_decoder();
+
     loop {
-        let mut buffer: [u8; 524] = [0; 524];
-        let result = b.read_exact(&mut buffer);
-        if let Err(r) = result {
-            panic!("read error: {:?}", r);
+        let buffer = Buffer::read_from_file(&mut buf);
+
+        // Fast Information Channel
+        if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
+            fic.try_buffer(fic_buffer);
         }
-        dbg!(buffer);
     }
 }
