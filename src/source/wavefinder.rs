@@ -4,94 +4,107 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::mpsc;
+use std::sync::mpsc::{self, Sender};
 use std::thread;
 
 use crate::wavefinder::{Buffer, Wavefinder};
 use crate::{fic, prs, wavefinder};
 
+use super::Source;
+
 static LOCKED: AtomicBool = AtomicBool::new(false);
 
-pub fn run(path: Option<PathBuf>) {
-    let file_output = path.is_some();
-    let mut w: Wavefinder = wavefinder::open();
-    let prs = RefCell::new(prs::new_symbol());
+pub struct WavefinderSource {
+    fic_tx: Sender<FastInformationChannelBuffer>,
+    path: Option<PathBuf>,
+}
 
-    let (message_tx, message_rx) = mpsc::channel();
-    let (prs_tx, prs_rx) = mpsc::channel();
-    let (file_tx, file_rx) = mpsc::channel::<Buffer>();
-    let (fic_tx, fic_rx) = mpsc::channel();
+pub fn new_wavefinder_source(fic_tx: Sender<FastInformationChannelBuffer>, path: Option<PathBuf>) -> impl Source {
+    WavefinderSource {
+        fic_tx,
+        path
+    }
+}
 
-    thread::spawn(move || {
-        let mut sync = prs::new_synchroniser(&LOCKED);
-        loop {
-            let result = prs_rx.recv();
-            if let Ok(complete_prs) = result {
-                let messages = sync.try_sync_prs(complete_prs);
-                for m in messages {
-                    message_tx.send(m).unwrap(); // handle Err?
-                }
-            }
-        }
-    });
+impl Source for WavefinderSource {
 
-    thread::spawn(move || {
-        let mut fic = fic::new_decoder();
-        while let Ok(buffer) = fic_rx.recv() {
-            fic.try_buffer(buffer);
-        }
-    });
+    fn run(&self) {
+        let file_output = self.path.is_some();
+        let mut w: Wavefinder = wavefinder::open();
+        let prs = RefCell::new(prs::new_symbol());
 
-    if file_output {
+        let (message_tx, message_rx) = mpsc::channel();
+        let (prs_tx, prs_rx) = mpsc::channel();
+        let (file_tx, file_rx) = mpsc::channel::<Buffer>();
+
         thread::spawn(move || {
-            if let Some(p) = path {
-                let f = File::create(p).expect("Unable to create file");
-                let mut buf = BufWriter::new(f);
-
-                loop {
-                    let result = file_rx.recv();
-                    if let Ok(buffer) = result {
-                        buffer.write_to_file(&mut buf);
+            let mut sync = prs::new_synchroniser(&LOCKED);
+            loop {
+                let result = prs_rx.recv();
+                if let Ok(complete_prs) = result {
+                    let messages = sync.try_sync_prs(complete_prs);
+                    for m in messages {
+                        message_tx.send(m).unwrap(); // handle Err?
                     }
                 }
             }
         });
-    }
 
-    let cb = move |buffer: Buffer| {
-        // Phase Reference Symbol
-        prs.borrow_mut().try_buffer(&buffer);
-        if prs.borrow_mut().is_complete() {
-            let p = prs.replace_with(|_| prs::new_symbol());
-            prs_tx.send(p).unwrap();
+        let path = self.path.clone();
+
+        if file_output {
+            thread::spawn(move || {
+                if let Some(p) = path {
+                    let f = File::create(p).expect("Unable to create file");
+                    let mut buf = BufWriter::new(f);
+
+                    loop {
+                        let result = file_rx.recv();
+                        if let Ok(buffer) = result {
+                            buffer.write_to_file(&mut buf);
+                        }
+                    }
+                }
+            });
         }
 
-        if LOCKED.load(std::sync::atomic::Ordering::Relaxed) {
-            // Fast Information Channel
-            if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
-                fic_tx.send(fic_buffer).unwrap();
+        let fic_tx = self.fic_tx.clone();
+
+        let cb = move |buffer: Buffer| {
+            // Phase Reference Symbol
+            prs.borrow_mut().try_buffer(&buffer);
+            if prs.borrow_mut().is_complete() {
+                let p = prs.replace_with(|_| prs::new_symbol());
+                prs_tx.send(p).unwrap();
             }
 
-            // File writer
-            if file_output {
-                file_tx.send(buffer).unwrap();
+            if LOCKED.load(std::sync::atomic::Ordering::Relaxed) {
+                // Fast Information Channel
+                if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
+                    fic_tx.send(fic_buffer).unwrap();
+                }
+
+                // File writer
+                if file_output {
+                    file_tx.send(buffer).unwrap();
+                }
             }
-        }
-    };
+        };
 
-    w.set_callback(cb);
-    w.init(225.648); // BBC National DAB
+        w.set_callback(cb);
+        w.init(225.648); // BBC National DAB
 
-    // w.init(218.640); // Ayr
-    // w.init(223.936); // D1 National (Scotland)
-    // w.init(216.928); // Should be National 2
-    // w.init(222.064); // Should be Central Scotland
-    w.read();
+        // w.init(218.640); // Ayr
+        // w.init(223.936); // D1 National (Scotland)
+        // w.init(216.928); // Should be National 2
+        // w.init(222.064); // Should be Central Scotland
+        w.read();
 
-    loop {
-        w.handle_events();
-        while let Ok(m) = message_rx.try_recv() {
-            w.send_ctrl_message(&m);
+        loop {
+            w.handle_events();
+            while let Ok(m) = message_rx.try_recv() {
+                w.send_ctrl_message(&m);
+            }
         }
     }
 }
