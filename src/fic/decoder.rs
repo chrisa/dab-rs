@@ -65,7 +65,6 @@ impl FastInformationChannelDecoder {
 
         if frame.next_symbol > 4 {
             if let Ok(blocks) = self.decode_and_crc(&frame) {
-                dbg!(&blocks);
                 return Some(blocks);
             }
             else {
