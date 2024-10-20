@@ -139,12 +139,10 @@ impl FastInformationChannelDecoder {
                 if *h == 0xff {
                     return None;
                 }
-                if let Some(mut header) = fig_header(*h) {
-                    let mut body = it.take(header.len);
-                    while let Some(b) = body.next() {
-                        header.data.push(*b);
-                    }
-                    return Some(header);
+                if let Some(mut fig) = fig_header(*h) {
+                    let body = it.take(fig.header.len);
+                    fig.push_data(body.map(|b| *b).collect());
+                    return Some(fig);
                 }
             }
             None
