@@ -1,4 +1,5 @@
 use std::fmt;
+use itertools::Itertools;
 
 use crate::{
     decode::{
@@ -8,7 +9,7 @@ use crate::{
     fic::new_frame,
 };
 
-use super::{FastInformationBlock, FastInformationChannelBuffer, FastInformationChannelFrame};
+use super::{fig::{fig_header, Fig}, FastInformationBlock, FastInformationChannelBuffer, FastInformationChannelFrame};
 
 pub struct FastInformationChannelDecoder {
     frames: Box<[Option<FastInformationChannelFrame>; 32]>,
@@ -114,7 +115,7 @@ impl FastInformationChannelDecoder {
             }
         }
 
-        let mut fib_chars: [[char; 30]; 12] = [[0 as char; 30]; 12];
+        let mut fib_bytes: [[u8; 30]; 12] = [[0 as u8; 30]; 12];
 
         for i in 0..12 {
             // Check CRC
@@ -124,10 +125,30 @@ impl FastInformationChannelDecoder {
 
             // If OK, convert to bytes
             let bytes = bits_to_bytes(&fibs[i]);
-            fib_chars[i].copy_from_slice(&bytes.map(char::from));
+            fib_bytes[i].copy_from_slice(&bytes);
         }
 
-        let blocks = fib_chars.map(|chars| FastInformationBlock { chars, num: frame.frame_number }).to_vec();
+        let blocks = fib_bytes.map(|bytes| FastInformationBlock { bytes, num: frame.frame_number }).to_vec();
         Ok(blocks)
+    }
+
+    pub fn extract_figs(&self, fib: &FastInformationBlock) -> Vec<Fig> {
+        let fig_iter = fib.bytes.iter().batching(|it| {
+            if let Some(h) = it.next() {
+                // end marker
+                if *h == 0xff {
+                    return None;
+                }
+                if let Some(mut header) = fig_header(*h) {
+                    let mut body = it.take(header.len);
+                    while let Some(b) = body.next() {
+                        header.data.push(*b);
+                    }
+                    return Some(header);
+                }
+            }
+            None
+        });
+        fig_iter.collect()
     }
 }

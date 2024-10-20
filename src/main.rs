@@ -49,7 +49,12 @@ fn go(rx: Receiver<Buffer>, source: &impl Source) {
                 break;
             }
             if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
-                fic_decoder.try_buffer(fic_buffer);            
+                if let Some(fibs) = fic_decoder.try_buffer(fic_buffer) {
+                    for fib in fibs {
+                        let figs = fic_decoder.extract_figs(&fib);
+                        dbg!(&figs);
+                    }
+                }
             }
         }
     });

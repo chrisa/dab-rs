@@ -3,6 +3,7 @@ use core::fmt;
 use crate::wavefinder::Buffer;
 
 mod decoder;
+mod fig;
 
 pub use decoder::new_decoder;
 
@@ -73,16 +74,16 @@ pub fn new_frame(frame_number: u8) -> FastInformationChannelFrame {
 #[derive(Copy, Clone)]
 pub struct FastInformationBlock {
     num: u8,
-    chars: [char; 30],
+    bytes: [u8; 30],
 }
 
 impl fmt::Debug for FastInformationBlock {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut s = String::new();
         s.push_str(format!("{:?} = ", self.num).as_str());
-        for char in self.chars {
-            if char > 0x20 as char && char < 0x80 as char {
-                s.push(char);
+        for byte in self.bytes {
+            if byte > 0x20 && byte < 0x80 {
+                s.push(byte as char);
             } else {
                 s.push(' ');
             }
