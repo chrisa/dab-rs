@@ -81,7 +81,7 @@ impl Type1 {
     }
 
     fn ensemble(bytes: &Vec<u8>) -> LabelPurpose {
-        let data = bytes[1..2].view_bits::<Lsb0>();
+        let data = bytes[1..3].view_bits::<Lsb0>();
         let eid = data[0..16].load_be();
         LabelPurpose::Ensemble { EId: eid }
     }
