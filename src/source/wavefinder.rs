@@ -1,4 +1,3 @@
-use fic::FastInformationChannelBuffer;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::BufWriter;
@@ -8,20 +7,20 @@ use std::sync::mpsc::{self, Sender};
 use std::thread;
 
 use crate::wavefinder::{Buffer, Wavefinder};
-use crate::{fic, prs, wavefinder};
+use crate::{prs, wavefinder};
 
 use super::Source;
 
 static LOCKED: AtomicBool = AtomicBool::new(false);
 
 pub struct WavefinderSource {
-    fic_tx: Sender<FastInformationChannelBuffer>,
+    tx: Sender<Buffer>,
     path: Option<PathBuf>,
 }
 
-pub fn new_wavefinder_source(fic_tx: Sender<FastInformationChannelBuffer>, path: Option<PathBuf>) -> impl Source {
+pub fn new_wavefinder_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> impl Source {
     WavefinderSource {
-        fic_tx,
+        tx,
         path
     }
 }
@@ -68,7 +67,7 @@ impl Source for WavefinderSource {
             });
         }
 
-        let fic_tx = self.fic_tx.clone();
+        let tx = self.tx.clone();
 
         let cb = move |buffer: Buffer| {
             // Phase Reference Symbol
@@ -79,10 +78,7 @@ impl Source for WavefinderSource {
             }
 
             if LOCKED.load(std::sync::atomic::Ordering::Relaxed) {
-                // Fast Information Channel
-                if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
-                    fic_tx.send(fic_buffer).unwrap();
-                }
+                tx.send(buffer).unwrap();
 
                 // File writer
                 if file_output {

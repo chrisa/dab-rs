@@ -1,20 +1,17 @@
 use std::{fs::File, io::BufReader, path::PathBuf, sync::mpsc::Sender};
 
-use crate::{
-    fic::FastInformationChannelBuffer,
-    wavefinder::Buffer,
-};
+use crate::wavefinder::Buffer;
 
 use super::Source;
 
 pub struct FileSource {
-    fic_tx: Sender<FastInformationChannelBuffer>,
+    tx: Sender<Buffer>,
     path: Option<PathBuf>,
 }
 
-pub fn new_file_source(fic_tx: Sender<FastInformationChannelBuffer>, path: Option<PathBuf>) -> impl Source {
+pub fn new_file_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> impl Source {
     FileSource {
-        fic_tx,
+        tx,
         path
     }
 }
@@ -36,12 +33,12 @@ impl Source for FileSource {
         }
 
         loop {
-            let buffer = Buffer::read_from_file(&mut buf);
-    
-            // Fast Information Channel
-            if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
-                self.fic_tx.send(fic_buffer).unwrap();
-            }
+            let result = Buffer::read_from_file(&mut buf);
+            let Ok(buffer) = result else {
+                self.tx.send(Buffer { bytes: [0; 524], last: true }).unwrap();
+                break;
+            };
+            self.tx.send(buffer).unwrap();
         }
     }    
 }

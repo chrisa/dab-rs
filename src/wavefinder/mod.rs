@@ -10,7 +10,7 @@ pub use message::*;
 
 use std::{
     fs::File,
-    io::{BufReader, BufWriter, Read, Write},
+    io::{self, BufReader, BufWriter, Read, Write},
     thread,
     time::Duration,
 };
@@ -23,6 +23,7 @@ pub struct Wavefinder {
 #[derive(Debug, Copy, Clone)]
 pub struct Buffer {
     pub bytes: [u8; 524],
+    pub last: bool,
 }
 
 impl Buffer {
@@ -30,13 +31,13 @@ impl Buffer {
         buf.write_all(&self.bytes).expect("failed to write to file");
     }
 
-    pub fn read_from_file(buf: &mut BufReader<File>) -> Buffer {
+    pub fn read_from_file(buf: &mut BufReader<File>) -> Result<Buffer, io::Error> {
         let mut buffer: [u8; 524] = [0; 524];
         let result = buf.read_exact(&mut buffer);
         if let Err(r) = result {
-            panic!("read error: {:?}", r);
+            return Err(r);
         }
-        Buffer { bytes: buffer }
+        Ok(Buffer { bytes: buffer, last: false })
     }
 }
 
@@ -64,7 +65,7 @@ unsafe extern "C" fn call_closure<F>(
     let callback = &mut *callback_ptr;
     let slice = unsafe { std::slice::from_raw_parts(buf, len) };
     if let Ok(bytes) = slice.try_into() {
-        callback(Buffer { bytes });
+        callback(Buffer { bytes, last: false });
     } else {
         println!("short read? len = {:?}", len);
     }

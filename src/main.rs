@@ -13,6 +13,7 @@ use std::{sync::mpsc::{self, Receiver}, thread};
 use clap::Parser;
 use fic::FastInformationChannelBuffer;
 use source::Source;
+use wavefinder::Buffer;
 
 #[derive(Debug, Clone, clap::ValueEnum, PartialEq)]
 enum CliSource {
@@ -29,24 +30,30 @@ struct Cli {
 
 fn main() {
     let args = Cli::parse();
-    let (fic_tx, fic_rx) = mpsc::channel();
+    let (tx, rx) = mpsc::channel();
 
     if args.source == CliSource::Wavefinder {
-        go(fic_rx, &source::wavefinder::new_wavefinder_source(fic_tx, args.file));
+        go(rx, &source::wavefinder::new_wavefinder_source(tx, args.file));
     }
     else if args.source == CliSource::File {
-        go(fic_rx, &source::file::new_file_source(fic_tx, args.file));
+        go(rx, &source::file::new_file_source(tx, args.file));
     }
 }
 
-fn go(fic_rx: Receiver<FastInformationChannelBuffer>, source: &impl Source) {
+fn go(rx: Receiver<Buffer>, source: &impl Source) {
+    let mut fic_decoder = fic::new_decoder();
 
-    thread::spawn(move || {
-        let mut fic = fic::new_decoder();
-        while let Ok(buffer) = fic_rx.recv() {
-            fic.try_buffer(buffer);
+    let t = thread::spawn(move || {
+        while let Ok(buffer) = rx.recv() {
+            if buffer.last {
+                break;
+            }
+            if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
+                fic_decoder.try_buffer(fic_buffer);            
+            }
         }
     });
 
     source.run();
+    t.join().unwrap();
 }

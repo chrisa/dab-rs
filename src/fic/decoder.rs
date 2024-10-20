@@ -69,6 +69,7 @@ impl FastInformationChannelDecoder {
             }
             else {
                 // CRC check failed
+                println!("frame {:?} failed crc", frame.frame_number);
                 self.frames[frame.frame_number as usize] = None;
                 return None;
             }
