@@ -2,8 +2,8 @@ use core::fmt;
 
 use crate::wavefinder::Buffer;
 
-pub mod ensemble;
 pub mod decoder;
+pub mod ensemble;
 pub mod fig;
 
 pub use decoder::new_decoder;

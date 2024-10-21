@@ -1,5 +1,5 @@
-use std::fmt;
 use itertools::Itertools;
+use std::fmt;
 
 use crate::{
     decode::{
@@ -9,7 +9,10 @@ use crate::{
     fic::new_frame,
 };
 
-use super::{fig::{fig_header, Fig}, FastInformationBlock, FastInformationChannelBuffer, FastInformationChannelFrame};
+use super::{
+    fig::{fig_header, Fig},
+    FastInformationBlock, FastInformationChannelBuffer, FastInformationChannelFrame,
+};
 
 pub struct FastInformationChannelDecoder {
     frames: Box<[Option<FastInformationChannelFrame>; 32]>,
@@ -43,7 +46,10 @@ impl fmt::Debug for FastInformationChannelDecoder {
 }
 
 impl FastInformationChannelDecoder {
-    pub fn try_buffer(&mut self, buffer: FastInformationChannelBuffer) -> Option<Vec<FastInformationBlock>> {
+    pub fn try_buffer(
+        &mut self,
+        buffer: FastInformationChannelBuffer,
+    ) -> Option<Vec<FastInformationBlock>> {
         let mut frame;
 
         if let Some(f) = self.frames[buffer.frame as usize] {
@@ -66,15 +72,14 @@ impl FastInformationChannelDecoder {
         if frame.next_symbol > 4 {
             if let Ok(blocks) = self.decode_and_crc(&frame) {
                 return Some(blocks);
-            }
-            else {
+            } else {
                 // CRC check failed
                 println!("frame {:?} failed crc", frame.frame_number);
                 self.frames[frame.frame_number as usize] = None;
                 return None;
             }
         }
-        
+
         // Not enough symbols yet
         None
     }
@@ -89,7 +94,10 @@ impl FastInformationChannelDecoder {
         frame.next_symbol = buffer.symbol + 1;
     }
 
-    fn decode_and_crc(&self, frame: &FastInformationChannelFrame) -> Result<Vec<FastInformationBlock>, &'static str> {
+    fn decode_and_crc(
+        &self,
+        frame: &FastInformationChannelFrame,
+    ) -> Result<Vec<FastInformationBlock>, &'static str> {
         let mut merged: [u8; 9216] = [0u8; 9216];
 
         for (i, sym) in frame.bytes.iter().enumerate() {
@@ -127,7 +135,12 @@ impl FastInformationChannelDecoder {
             fib_bytes[i].copy_from_slice(&bytes);
         }
 
-        let blocks = fib_bytes.map(|bytes| FastInformationBlock { bytes, num: frame.frame_number }).to_vec();
+        let blocks = fib_bytes
+            .map(|bytes| FastInformationBlock {
+                bytes,
+                num: frame.frame_number,
+            })
+            .to_vec();
         Ok(blocks)
     }
 

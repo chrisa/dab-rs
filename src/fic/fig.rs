@@ -1,4 +1,8 @@
-use bitvec::{field::BitField, order::{Lsb0, Msb0}, view::BitView};
+use bitvec::{
+    field::BitField,
+    order::{Lsb0, Msb0},
+    view::BitView,
+};
 use core::fmt::Debug;
 
 #[derive(Debug)]
@@ -28,20 +32,69 @@ pub struct Type0 {
 #[derive(Debug)]
 pub enum Information {
     Unknown,
-    Ensemble { OccChg: u8, CIFCntL: u8, CIFCntH: u8, AlrmFlg: u8, ChgFlg: u8, EId: u16 },
-    SubChannelShort { SubChId: u8, StartAddr: u16, TableSw: u8, TabIndx: u8 },
-    SubChannelLong { SubChId: u8, StartAddr: u16, Opt: u8, ProtLvl: u8, SubChSz: u16 },
-    Service { SId: u32, PD: bool, components: Vec<ServiceComponent> },
-    PacketService { SCId: u16, SCCAFlag: u8, DG: u8, DSCTy: u8, SubChId: u8, PacketAddr: u16, SCCA: u16 },
+    Ensemble {
+        OccChg: u8,
+        CIFCntL: u8,
+        CIFCntH: u8,
+        AlrmFlg: u8,
+        ChgFlg: u8,
+        EId: u16,
+    },
+    SubChannelShort {
+        SubChId: u8,
+        StartAddr: u16,
+        TableSw: u8,
+        TabIndx: u8,
+    },
+    SubChannelLong {
+        SubChId: u8,
+        StartAddr: u16,
+        Opt: u8,
+        ProtLvl: u8,
+        SubChSz: u16,
+    },
+    Service {
+        SId: u32,
+        PD: bool,
+        components: Vec<ServiceComponent>,
+    },
+    PacketService {
+        SCId: u16,
+        SCCAFlag: u8,
+        DG: u8,
+        DSCTy: u8,
+        SubChId: u8,
+        PacketAddr: u16,
+        SCCA: u16,
+    },
 }
 
 #[derive(Debug)]
 pub enum ServiceComponent {
     Unknown,
-    StreamAudio { ASCTy: u8, SubChId: u8, PS: u8, CAFlg: u8 },
-    StreamData { DSCTy: u8, SubChId: u8, PS: u8, CAFlg: u8 },
-    FIDC { DSCTy: u8, FIDCId: u8, PS: u8, CAFlg: u8 },
-    PacketData { SCId: u16, PS: u8, CAFlg: u8 },
+    StreamAudio {
+        ASCTy: u8,
+        SubChId: u8,
+        PS: u8,
+        CAFlg: u8,
+    },
+    StreamData {
+        DSCTy: u8,
+        SubChId: u8,
+        PS: u8,
+        CAFlg: u8,
+    },
+    FIDC {
+        DSCTy: u8,
+        FIDCId: u8,
+        PS: u8,
+        CAFlg: u8,
+    },
+    PacketData {
+        SCId: u16,
+        PS: u8,
+        CAFlg: u8,
+    },
 }
 
 #[derive(Debug)]
@@ -53,10 +106,21 @@ pub struct Type1 {
 #[derive(Debug)]
 pub enum LabelPurpose {
     Unknown,
-    Ensemble { EId: u16 },
-    ProgrammeService { SId: u16 },
-    DataService { SId: u32 },
-    ServiceComponent { SId: u32, PD: bool, Rfa: u8, SCIdS: u8 },
+    Ensemble {
+        EId: u16,
+    },
+    ProgrammeService {
+        SId: u16,
+    },
+    DataService {
+        SId: u32,
+    },
+    ServiceComponent {
+        SId: u32,
+        PD: bool,
+        Rfa: u8,
+        SCIdS: u8,
+    },
 }
 
 impl Fig {
@@ -93,15 +157,29 @@ pub fn fig_header(byte: u8) -> Option<Fig> {
 }
 
 fn fig_unknown(kind: u8, len: usize) -> Fig {
-    Fig { header: FigHeader { kind, len }, kind: FigKind::Unknown }
+    Fig {
+        header: FigHeader { kind, len },
+        kind: FigKind::Unknown,
+    }
 }
 
 fn fig_0(len: usize) -> Fig {
-    Fig { header: FigHeader { kind: 0, len }, kind: FigKind::Type0(Type0 { info: vec!(Information::Unknown) }) }
+    Fig {
+        header: FigHeader { kind: 0, len },
+        kind: FigKind::Type0(Type0 {
+            info: vec![Information::Unknown],
+        }),
+    }
 }
 
 fn fig_1(len: usize) -> Fig {
-    Fig { header: FigHeader { kind: 1, len }, kind: FigKind::Type1(Type1 { purpose: LabelPurpose::Unknown, label: "".to_owned() }) }
+    Fig {
+        header: FigHeader { kind: 1, len },
+        kind: FigKind::Type1(Type1 {
+            purpose: LabelPurpose::Unknown,
+            label: "".to_owned(),
+        }),
+    }
 }
 
 impl Type0 {
@@ -116,7 +194,7 @@ impl Type0 {
             1 => Type0::subchannel(pd, &bytes[1..]),
             2 => Type0::service(pd, &bytes[1..]),
             3 => Type0::packet_service_component(pd, &bytes[1..]),
-            _ => vec!(Information::Unknown),
+            _ => vec![Information::Unknown],
         };
     }
 
@@ -129,13 +207,20 @@ impl Type0 {
         let CIFCntH: u8 = data[19..24].load_be();
         let CIFCntL: u8 = data[24..32].load_be();
         // let OccChg: u8 = data[32..40].load_be();
-        vec!(Information::Ensemble { OccChg: 0, CIFCntL, CIFCntH, AlrmFlg, ChgFlg, EId })
+        vec![Information::Ensemble {
+            OccChg: 0,
+            CIFCntL,
+            CIFCntH,
+            AlrmFlg,
+            ChgFlg,
+            EId,
+        }]
     }
 
     fn subchannel(pd: u8, bytes: &[u8]) -> Vec<Information> {
         let mut offset = 0;
         let mut subchannels = Vec::new();
-        while offset < bytes.len() {            
+        while offset < bytes.len() {
             let data = bytes[offset..].view_bits::<Msb0>();
             let SubChId: u8 = data[0..6].load_be();
             let StartAddr: u16 = data[6..16].load_be();
@@ -146,14 +231,24 @@ impl Type0 {
                 let Opt: u8 = data[17..20].load_be();
                 let ProtLvl: u8 = data[20..22].load_be();
                 let SubChSz: u16 = data[22..32].load_be();
-                subchannels.push(Information::SubChannelLong { SubChId, StartAddr, Opt, ProtLvl, SubChSz });
-            }
-            else {
+                subchannels.push(Information::SubChannelLong {
+                    SubChId,
+                    StartAddr,
+                    Opt,
+                    ProtLvl,
+                    SubChSz,
+                });
+            } else {
                 assert!(bytes[offset..].len() >= 3);
                 offset += 3;
                 let TableSw: u8 = data[17..18].load_be();
                 let TabIndx: u8 = data[18..24].load_be();
-                subchannels.push(Information::SubChannelShort { SubChId, StartAddr, TableSw, TabIndx });
+                subchannels.push(Information::SubChannelShort {
+                    SubChId,
+                    StartAddr,
+                    TableSw,
+                    TabIndx,
+                });
             }
         }
         subchannels
@@ -162,24 +257,23 @@ impl Type0 {
     fn service(pd: u8, bytes: &[u8]) -> Vec<Information> {
         let mut offset = 0;
         let mut services = Vec::new();
-        while offset < bytes.len() {            
+        while offset < bytes.len() {
             let mut data = bytes[offset..].view_bits::<Msb0>();
             let SId: u32;
             if pd != 0 {
                 SId = data[0..32].load_be();
                 offset += 4;
-            }
-            else {
+            } else {
                 SId = data[0..16].load_be();
                 offset += 2;
             }
             data = bytes[offset..].view_bits::<Msb0>();
-            let Local: u8  = data[0..1].load_be();
+            let Local: u8 = data[0..1].load_be();
             let CAId: u8 = data[1..4].load_be();
             let NumSCmp: u8 = data[4..8].load_be();
             offset += 1;
-            let mut components = vec!();
-            for i in 0..NumSCmp { 
+            let mut components = vec![];
+            for i in 0..NumSCmp {
                 data = bytes[offset..].view_bits::<Msb0>();
                 let TMId: u8 = data[0..2].load_be();
                 components.push(match TMId {
@@ -188,33 +282,52 @@ impl Type0 {
                         let SubChId: u8 = data[8..14].load_be();
                         let PS: u8 = data[14..15].load_be();
                         let CAFlg: u8 = data[15..16].load_be();
-                        ServiceComponent::StreamAudio { ASCTy, SubChId, PS, CAFlg }
-                    },
+                        ServiceComponent::StreamAudio {
+                            ASCTy,
+                            SubChId,
+                            PS,
+                            CAFlg,
+                        }
+                    }
                     1 => {
                         let DSCTy: u8 = data[2..8].load_be();
                         let SubChId: u8 = data[8..14].load_be();
                         let PS: u8 = data[14..15].load_be();
                         let CAFlg: u8 = data[15..16].load_be();
-                        ServiceComponent::StreamData { DSCTy, SubChId, PS, CAFlg }
-                    },
+                        ServiceComponent::StreamData {
+                            DSCTy,
+                            SubChId,
+                            PS,
+                            CAFlg,
+                        }
+                    }
                     2 => {
                         let DSCTy: u8 = data[2..8].load_be();
                         let FIDCId: u8 = data[8..14].load_be();
                         let PS: u8 = data[14..15].load_be();
                         let CAFlg: u8 = data[15..16].load_be();
-                        ServiceComponent::FIDC { DSCTy, FIDCId, PS, CAFlg }
-                    },
+                        ServiceComponent::FIDC {
+                            DSCTy,
+                            FIDCId,
+                            PS,
+                            CAFlg,
+                        }
+                    }
                     3 => {
                         let SCId: u16 = data[2..14].load_be();
                         let PS: u8 = data[14..15].load_be();
                         let CAFlg: u8 = data[15..16].load_be();
                         ServiceComponent::PacketData { SCId, PS, CAFlg }
-                    },
+                    }
                     _ => ServiceComponent::Unknown,
                 });
                 offset += 2;
             }
-            services.push(Information::Service { SId, PD: pd != 0, components })
+            services.push(Information::Service {
+                SId,
+                PD: pd != 0,
+                components,
+            })
         }
         services
     }
@@ -222,7 +335,7 @@ impl Type0 {
     fn packet_service_component(pd: u8, bytes: &[u8]) -> Vec<Information> {
         let mut offset = 0;
         let mut service_components = Vec::new();
-        while offset < bytes.len() {            
+        while offset < bytes.len() {
             let data = bytes[offset..].view_bits::<Msb0>();
             let SCId: u16 = data[0..12].load_be();
             let Rfa: u8 = data[12..15].load_be();
@@ -233,7 +346,15 @@ impl Type0 {
             let SubChId: u8 = data[24..30].load_be();
             let PacketAddr: u16 = data[30..40].load_be();
             // let SCCA: u16 = data[40..56].load_be();
-            service_components.push(Information::PacketService { SCId, SCCAFlag, DG, DSCTy, SubChId, PacketAddr, SCCA: 0 });
+            service_components.push(Information::PacketService {
+                SCId,
+                SCCAFlag,
+                DG,
+                DSCTy,
+                SubChId,
+                PacketAddr,
+                SCCA: 0,
+            });
             offset += 5;
         }
         service_components
@@ -241,7 +362,13 @@ impl Type0 {
 }
 
 fn label(bytes: Vec<u8>) -> String {
-    String::from_utf8(bytes.iter().map(|b| if *b == 0 { 32 } else { *b }).collect()).unwrap()
+    String::from_utf8(
+        bytes
+            .iter()
+            .map(|b| if *b == 0 { 32 } else { *b })
+            .collect(),
+    )
+    .unwrap()
 }
 
 impl Type1 {
@@ -265,11 +392,10 @@ impl Type1 {
                 let PD: u8 = data[7..8].load_be();
                 if PD != 0 {
                     label(bytes[6..22].to_vec())
-                }
-                else {
+                } else {
                     label(bytes[4..20].to_vec())
                 }
-            },
+            }
             5 => label(bytes[5..21].to_vec()),
             _ => "".to_owned(),
         };
@@ -295,19 +421,21 @@ impl Type1 {
         let SId = if PD == 1 {
             let data = bytes[2..6].view_bits::<Lsb0>();
             data[0..32].load_be()
-        }
-        else {
+        } else {
             let data = bytes[2..4].view_bits::<Lsb0>();
             data[0..16].load_be()
         };
-        LabelPurpose::ServiceComponent { SId, Rfa, SCIdS, PD: PD != 0 }
+        LabelPurpose::ServiceComponent {
+            SId,
+            Rfa,
+            SCIdS,
+            PD: PD != 0,
+        }
     }
 
     fn data_service(bytes: &[u8]) -> LabelPurpose {
         let data = bytes[1..5].view_bits::<Lsb0>();
         let SId = data[0..32].load_be();
-        LabelPurpose::DataService { SId }        
+        LabelPurpose::DataService { SId }
     }
-
 }
-

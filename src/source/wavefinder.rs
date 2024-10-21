@@ -19,14 +19,10 @@ pub struct WavefinderSource {
 }
 
 pub fn new_wavefinder_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> impl Source {
-    WavefinderSource {
-        tx,
-        path
-    }
+    WavefinderSource { tx, path }
 }
 
 impl Source for WavefinderSource {
-
     fn run(&self) {
         let file_output = self.path.is_some();
         let mut w: Wavefinder = wavefinder::open();
@@ -89,7 +85,7 @@ impl Source for WavefinderSource {
 
         w.set_callback(cb);
         w.init(225.648); // BBC National DAB
-        
+
         // w.init(218.640); // Ayr
         // w.init(223.936); // D1 National (Scotland)
         // w.init(216.928); // Should be National 2

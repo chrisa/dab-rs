@@ -8,7 +8,10 @@ mod prs;
 mod source;
 mod wavefinder;
 
-use std::{sync::mpsc::{self, Receiver}, thread};
+use std::{
+    sync::mpsc::{self, Receiver},
+    thread,
+};
 
 use clap::Parser;
 use fic::{ensemble::new_ensemble, FastInformationChannelBuffer};
@@ -33,9 +36,11 @@ fn main() {
     let (tx, rx) = mpsc::channel();
 
     if args.source == CliSource::Wavefinder {
-        go(rx, &source::wavefinder::new_wavefinder_source(tx, args.file));
-    }
-    else if args.source == CliSource::File {
+        go(
+            rx,
+            &source::wavefinder::new_wavefinder_source(tx, args.file),
+        );
+    } else if args.source == CliSource::File {
         go(rx, &source::file::new_file_source(tx, args.file));
     }
 }

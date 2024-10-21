@@ -35,7 +35,10 @@ impl Buffer {
         let mut buffer: [u8; 524] = [0; 524];
         let result = buf.read_exact(&mut buffer);
         result?;
-        Ok(Buffer { bytes: buffer, last: false })
+        Ok(Buffer {
+            bytes: buffer,
+            last: false,
+        })
     }
 }
 

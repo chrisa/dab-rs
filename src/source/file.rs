@@ -10,14 +10,10 @@ pub struct FileSource {
 }
 
 pub fn new_file_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> impl Source {
-    FileSource {
-        tx,
-        path
-    }
+    FileSource { tx, path }
 }
 
 impl Source for FileSource {
-
     fn run(&self) {
         let mut buf;
         let path = self.path.clone();
@@ -35,11 +31,15 @@ impl Source for FileSource {
         loop {
             let result = Buffer::read_from_file(&mut buf);
             let Ok(buffer) = result else {
-                self.tx.send(Buffer { bytes: [0; 524], last: true }).unwrap();
+                self.tx
+                    .send(Buffer {
+                        bytes: [0; 524],
+                        last: true,
+                    })
+                    .unwrap();
                 break;
             };
             self.tx.send(buffer).unwrap();
         }
-    }    
+    }
 }
-
