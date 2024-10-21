@@ -11,7 +11,7 @@ mod wavefinder;
 use std::{sync::mpsc::{self, Receiver}, thread};
 
 use clap::Parser;
-use fic::FastInformationChannelBuffer;
+use fic::{ensemble::new_ensemble, fig::FigKind, FastInformationChannelBuffer};
 use source::Source;
 use wavefinder::Buffer;
 
@@ -42,6 +42,7 @@ fn main() {
 
 fn go(rx: Receiver<Buffer>, source: &impl Source) {
     let mut fic_decoder = fic::new_decoder();
+    let mut ens = new_ensemble();
 
     let t = thread::spawn(move || {
         while let Ok(buffer) = rx.recv() {
@@ -52,7 +53,10 @@ fn go(rx: Receiver<Buffer>, source: &impl Source) {
                 if let Some(fibs) = fic_decoder.try_buffer(fic_buffer) {
                     for fib in fibs {
                         let figs = fic_decoder.extract_figs(&fib);
-                        dbg!(&figs);
+                        for fig in figs {
+                            ens.add_fig(fig);
+                        }
+                        ens.display();
                     }
                 }
             }

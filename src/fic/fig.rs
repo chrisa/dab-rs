@@ -22,21 +22,21 @@ pub enum FigKind {
 
 #[derive(Debug)]
 pub struct Type0 {
-    info: Vec<Information>,
+    pub info: Vec<Information>,
 }
 
 #[derive(Debug)]
-enum Information {
+pub enum Information {
     Unknown,
     Ensemble { OccChg: u8, CIFCntL: u8, CIFCntH: u8, AlrmFlg: u8, ChgFlg: u8, EId: u16 },
     SubChannelShort { SubChId: u8, StartAddr: u16, TableSw: u8, TabIndx: u8 },
     SubChannelLong { SubChId: u8, StartAddr: u16, Opt: u8, ProtLvl: u8, SubChSz: u16 },
     Service { SId: u32, PD: bool, components: Vec<ServiceComponent> },
-    PacketService { },
+    PacketService { SCId: u16, SCCAFlag: u8, DG: u8, DSCTy: u8, SubChId: u8, PacketAddr: u16, SCCA: u16 },
 }
 
 #[derive(Debug)]
-enum ServiceComponent {
+pub enum ServiceComponent {
     Unknown,
     StreamAudio { ASCTy: u8, SubChId: u8, PS: u8, CAFlg: u8 },
     StreamData { DSCTy: u8, SubChId: u8, PS: u8, CAFlg: u8 },
@@ -46,12 +46,12 @@ enum ServiceComponent {
 
 #[derive(Debug)]
 pub struct Type1 {
-    label: String,
-    purpose: LabelPurpose,
+    pub label: String,
+    pub purpose: LabelPurpose,
 }
 
 #[derive(Debug)]
-enum LabelPurpose {
+pub enum LabelPurpose {
     Unknown,
     Ensemble { EId: u16 },
     ProgrammeService { SId: u16 },
@@ -115,9 +115,10 @@ impl Type0 {
             0 => Type0::ensemble(pd, &bytes[1..]),
             1 => Type0::subchannel(pd, &bytes[1..]),
             2 => Type0::service(pd, &bytes[1..]),
-            3 => Type0::packet_service(pd, &bytes[1..]),
+            3 => Type0::packet_service_component(pd, &bytes[1..]),
             _ => vec!(Information::Unknown),
         };
+        dbg!(&self);
     }
 
     fn ensemble(pd: u8, bytes: &[u8]) -> Vec<Information> {
@@ -219,8 +220,24 @@ impl Type0 {
         services
     }
 
-    fn packet_service(pd: u8, bytes: &[u8]) -> Vec<Information> {
-        vec!()
+    fn packet_service_component(pd: u8, bytes: &[u8]) -> Vec<Information> {
+        let mut offset = 0;
+        let mut service_components = Vec::new();
+        while offset < bytes.len() {            
+            let mut data = bytes[offset..].view_bits::<Msb0>();
+            let SCId: u16 = data[0..12].load_be();
+            let Rfa: u8 = data[12..15].load_be();
+            let SCCAFlag: u8 = data[15..16].load_be();
+            let DG: u8 = data[16..17].load_be();
+            let Rfu: u8 = data[17..18].load_be();
+            let DSCTy: u8 = data[18..24].load_be();
+            let SubChId: u8 = data[24..30].load_be();
+            let PacketAddr: u16 = data[30..40].load_be();
+            // let SCCA: u16 = data[40..56].load_be();
+            service_components.push(Information::PacketService { SCId, SCCAFlag, DG, DSCTy, SubChId, PacketAddr, SCCA: 0 });
+            offset += 5;
+        }
+        service_components
     }
 }
 
