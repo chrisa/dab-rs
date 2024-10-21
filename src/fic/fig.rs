@@ -70,7 +70,7 @@ impl FigKind {
         match self {
             FigKind::Type0(fig0) => fig0.push_data(bytes),
             FigKind::Type1(fig1) => fig1.push_data(bytes),
-            _ => return,
+            _ => (),
         }
     }
 }
@@ -223,7 +223,7 @@ impl Type0 {
         let mut offset = 0;
         let mut service_components = Vec::new();
         while offset < bytes.len() {            
-            let mut data = bytes[offset..].view_bits::<Msb0>();
+            let data = bytes[offset..].view_bits::<Msb0>();
             let SCId: u16 = data[0..12].load_be();
             let Rfa: u8 = data[12..15].load_be();
             let SCCAFlag: u8 = data[15..16].load_be();
@@ -275,36 +275,35 @@ impl Type1 {
         };
     }
 
-    fn ensemble(bytes: &Vec<u8>) -> LabelPurpose {
+    fn ensemble(bytes: &[u8]) -> LabelPurpose {
         let data = bytes[1..3].view_bits::<Lsb0>();
         let eid = data[0..16].load_be();
         LabelPurpose::Ensemble { EId: eid }
     }
 
-    fn programme_service(bytes: &Vec<u8>) -> LabelPurpose {
+    fn programme_service(bytes: &[u8]) -> LabelPurpose {
         let data = bytes[1..3].view_bits::<Lsb0>();
         let SId = data[0..16].load_be();
         LabelPurpose::ProgrammeService { SId }
     }
 
-    fn service_component(bytes: &Vec<u8>) -> LabelPurpose {
+    fn service_component(bytes: &[u8]) -> LabelPurpose {
         let data = bytes[1].view_bits::<Lsb0>();
         let SCIdS = data[0..4].load_be();
         let Rfa = data[4..7].load_be();
         let PD: u8 = data[7..8].load_be();
-        let SId;
-        if PD == 1 {
+        let SId = if PD == 1 {
             let data = bytes[2..6].view_bits::<Lsb0>();
-            SId = data[0..32].load_be();
+            data[0..32].load_be()
         }
         else {
             let data = bytes[2..4].view_bits::<Lsb0>();
-            SId = data[0..16].load_be();
-        }
+            data[0..16].load_be()
+        };
         LabelPurpose::ServiceComponent { SId, Rfa, SCIdS, PD: PD != 0 }
     }
 
-    fn data_service(bytes: &Vec<u8>) -> LabelPurpose {
+    fn data_service(bytes: &[u8]) -> LabelPurpose {
         let data = bytes[1..5].view_bits::<Lsb0>();
         let SId = data[0..32].load_be();
         LabelPurpose::DataService { SId }        

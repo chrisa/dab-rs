@@ -34,9 +34,7 @@ impl Buffer {
     pub fn read_from_file(buf: &mut BufReader<File>) -> Result<Buffer, io::Error> {
         let mut buffer: [u8; 524] = [0; 524];
         let result = buf.read_exact(&mut buffer);
-        if let Err(r) = result {
-            return Err(r);
-        }
+        result?;
         Ok(Buffer { bytes: buffer, last: false })
     }
 }

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use itertools::Itertools;
 
-use crate::wavefinder::daddr_t;
 
 use super::fig::{Fig, FigKind, Information, LabelPurpose, ServiceComponent};
 
@@ -140,7 +139,7 @@ impl Ensemble {
                 println!("{:16} (0x{:04x}) {} subch={} SCId={} start={} size={} addr={}", service.name, service.id, PS, data_subchannel.subchid, data_subchannel.id, data_subchannel.start, data_subchannel.size, data_subchannel.packet_addr);
             }
         }
-        println!("");
+        println!();
     }
 
     pub fn add_fig(&mut self, fig: Fig) {
@@ -206,9 +205,7 @@ impl Ensemble {
     }
 
     pub fn add_service(&mut self, service: Service) {
-        if let None = self.services.get(&service.id) {
-            self.services.insert(service.id, service);
-        }
+        self.services.entry(service.id).or_insert(service);
     }
 
     pub fn set_service_name(&mut self, service_id: u32, name: String) {
@@ -219,17 +216,13 @@ impl Ensemble {
 
     pub fn add_service_subchannel(&mut self, service_id: u32, subchannel: SubChannel) {
         if let Some(service) = self.services.get_mut(&service_id) {
-            if let None = service.subchannels.get(&subchannel.id) {
-                service.subchannels.insert(subchannel.id, subchannel);
-            }
+            service.subchannels.entry(subchannel.id).or_insert(subchannel);
         }
     }
 
     pub fn add_service_data_subchannel(&mut self, service_id: u32, subchannel: DataSubChannel) {
         if let Some(service) = self.services.get_mut(&service_id) {
-            if let None = service.data_subchannels.get(&subchannel.id) {
-                service.data_subchannels.insert(subchannel.id, subchannel);
-            }
+            service.data_subchannels.entry(subchannel.id).or_insert(subchannel);
         }
     }
 

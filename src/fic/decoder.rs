@@ -114,7 +114,7 @@ impl FastInformationChannelDecoder {
             }
         }
 
-        let mut fib_bytes: [[u8; 30]; 12] = [[0 as u8; 30]; 12];
+        let mut fib_bytes: [[u8; 30]; 12] = [[0_u8; 30]; 12];
 
         for i in 0..12 {
             // Check CRC
@@ -140,7 +140,7 @@ impl FastInformationChannelDecoder {
                 }
                 if let Some(mut fig) = fig_header(*h) {
                     let body = it.take(fig.header.len);
-                    fig.push_data(body.map(|b| *b).collect());
+                    fig.push_data(body.copied().collect());
                     return Some(fig);
                 }
             }

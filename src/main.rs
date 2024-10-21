@@ -11,7 +11,7 @@ mod wavefinder;
 use std::{sync::mpsc::{self, Receiver}, thread};
 
 use clap::Parser;
-use fic::{ensemble::new_ensemble, fig::FigKind, FastInformationChannelBuffer};
+use fic::{ensemble::new_ensemble, FastInformationChannelBuffer};
 use source::Source;
 use wavefinder::Buffer;
 
