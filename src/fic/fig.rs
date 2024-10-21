@@ -118,7 +118,6 @@ impl Type0 {
             3 => Type0::packet_service_component(pd, &bytes[1..]),
             _ => vec!(Information::Unknown),
         };
-        dbg!(&self);
     }
 
     fn ensemble(pd: u8, bytes: &[u8]) -> Vec<Information> {
@@ -241,6 +240,10 @@ impl Type0 {
     }
 }
 
+fn label(bytes: Vec<u8>) -> String {
+    String::from_utf8(bytes.iter().map(|b| if *b == 0 { 32 } else { *b }).collect()).unwrap()
+}
+
 impl Type1 {
     pub fn push_data(&mut self, bytes: Vec<u8>) {
         let header = bytes[0].view_bits::<Lsb0>();
@@ -255,19 +258,19 @@ impl Type1 {
             _ => LabelPurpose::Unknown,
         };
         self.label = match extn {
-            0 => String::from_utf8(bytes[3..19].to_vec()).unwrap(),
-            1 => String::from_utf8(bytes[3..19].to_vec()).unwrap(),
+            0 => label(bytes[3..19].to_vec()),
+            1 => label(bytes[3..19].to_vec()),
             4 => {
                 let data = bytes[1].view_bits::<Lsb0>();
                 let PD: u8 = data[7..8].load_be();
                 if PD != 0 {
-                    String::from_utf8(bytes[6..22].to_vec()).unwrap()
+                    label(bytes[6..22].to_vec())
                 }
                 else {
-                    String::from_utf8(bytes[4..20].to_vec()).unwrap()
+                    label(bytes[4..20].to_vec())
                 }
             },
-            5 => String::from_utf8(bytes[5..21].to_vec()).unwrap(),
+            5 => label(bytes[5..21].to_vec()),
             _ => "".to_owned(),
         };
     }
