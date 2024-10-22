@@ -337,10 +337,6 @@ impl Ensemble {
                 subchannel.prot = prot;
                 return;
             }
-            println!(
-                "looking for SCId {} in service {}",
-                subchannel_id, service_id
-            );
             for data_subchannel in service.data_subchannels.values_mut() {
                 if data_subchannel.subchid == subchannel_id {
                     data_subchannel.start = start;
