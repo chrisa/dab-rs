@@ -8,17 +8,17 @@ use core::fmt::Debug;
 #[derive(Debug)]
 pub struct Fig {
     pub header: FigHeader,
-    pub kind: FigKind,
+    pub figtype: FigType,
 }
 
 #[derive(Debug)]
 pub struct FigHeader {
-    pub kind: u8,
+    pub figtype: u8,
     pub len: usize,
 }
 
 #[derive(Debug)]
-pub enum FigKind {
+pub enum FigType {
     Unknown,
     Type0(Type0),
     Type1(Type1),
@@ -125,15 +125,15 @@ pub enum LabelPurpose {
 
 impl Fig {
     pub fn push_data(&mut self, bytes: Vec<u8>) {
-        self.kind.push_data(bytes)
+        self.figtype.push_data(bytes)
     }
 }
 
-impl FigKind {
+impl FigType {
     pub fn push_data(&mut self, bytes: Vec<u8>) {
         match self {
-            FigKind::Type0(fig0) => fig0.push_data(bytes),
-            FigKind::Type1(fig1) => fig1.push_data(bytes),
+            FigType::Type0(fig0) => fig0.push_data(bytes),
+            FigType::Type1(fig1) => fig1.push_data(bytes),
             _ => (),
         }
     }
@@ -142,31 +142,31 @@ impl FigKind {
 pub fn fig_header(byte: u8) -> Option<Fig> {
     let bits = byte.view_bits::<Lsb0>();
     let len = bits[0..5].load_be();
-    let kind: u8 = bits[5..8].load_be();
-    if kind > 7 {
+    let figtype: u8 = bits[5..8].load_be();
+    if figtype > 7 {
         return None;
     }
     if len > 30 {
         return None;
     }
-    Some(match kind {
+    Some(match figtype {
         0 => fig_0(len),
         1 => fig_1(len),
-        _ => fig_unknown(kind, len),
+        _ => fig_unknown(figtype, len),
     })
 }
 
-fn fig_unknown(kind: u8, len: usize) -> Fig {
+fn fig_unknown(figtype: u8, len: usize) -> Fig {
     Fig {
-        header: FigHeader { kind, len },
-        kind: FigKind::Unknown,
+        header: FigHeader { figtype, len },
+        figtype: FigType::Unknown,
     }
 }
 
 fn fig_0(len: usize) -> Fig {
     Fig {
-        header: FigHeader { kind: 0, len },
-        kind: FigKind::Type0(Type0 {
+        header: FigHeader { figtype: 0, len },
+        figtype: FigType::Type0(Type0 {
             info: vec![Information::Unknown],
         }),
     }
@@ -174,8 +174,8 @@ fn fig_0(len: usize) -> Fig {
 
 fn fig_1(len: usize) -> Fig {
     Fig {
-        header: FigHeader { kind: 1, len },
-        kind: FigKind::Type1(Type1 {
+        header: FigHeader { figtype: 1, len },
+        figtype: FigType::Type1(Type1 {
             purpose: LabelPurpose::Unknown,
             label: "".to_owned(),
         }),

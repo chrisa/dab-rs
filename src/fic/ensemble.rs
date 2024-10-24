@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 
-use super::fig::{Fig, FigKind, Information, LabelPurpose, ServiceComponent};
+use super::fig::{Fig, FigType, Information, LabelPurpose, ServiceComponent};
 
 pub struct Ensemble {
     id: u16,
@@ -247,8 +247,8 @@ impl Ensemble {
     }
 
     pub fn add_fig(&mut self, fig: Fig) {
-        match fig.kind {
-            FigKind::Type0(fig0) => {
+        match fig.figtype {
+            FigType::Type0(fig0) => {
                 for info in fig0.info {
                     match info {
                         Information::Ensemble { EId, .. } => self.set_id(EId),
@@ -333,7 +333,7 @@ impl Ensemble {
                     }
                 }
             }
-            FigKind::Type1(fig1) => {
+            FigType::Type1(fig1) => {
                 match fig1.purpose {
                     LabelPurpose::Ensemble { .. } => self.set_name(fig1.label), // assume one ensemble!
                     LabelPurpose::ProgrammeService { SId } => {
