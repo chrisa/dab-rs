@@ -164,28 +164,33 @@ static uep: [(u16, u16, u8); 64] = [
 ];
 
 impl Ensemble {
-
     pub fn is_complete(&self) -> bool {
         self.services_labelled() && self.subchannels_contiguous()
     }
 
     fn services_labelled(&self) -> bool {
-        self.services.values().map(|s| s.name.as_str() ).all(|n| n != "Unknown")
+        self.services
+            .values()
+            .map(|s| s.name.as_str())
+            .all(|n| n != "Unknown")
     }
 
     fn subchannels_contiguous(&self) -> bool {
-        let subchannels = self.services.values()
-            .flat_map(|s| s.subchannels.values() )
+        let subchannels = self
+            .services
+            .values()
+            .flat_map(|s| s.subchannels.values())
             .map(|sc| (sc.start, sc.size));
 
-        let data_subchannels = self.services.values()
+        let data_subchannels = self
+            .services
+            .values()
             .flat_map(|s| s.data_subchannels.values())
             .map(|dsc| (dsc.start, dsc.size));
 
         let all = subchannels.chain(data_subchannels);
 
-        !all
-            .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
+        !all.sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
             .scan(0u16, |state, sc| {
                 if sc.0 != *state {
                     return Some(u16::MAX);
@@ -277,7 +282,14 @@ impl Ensemble {
                                 if TabIndx < 64 {
                                     let (BitRate, SubChSz, ProtLvl) = uep[TabIndx as usize];
                                     self.set_service_subchannel_info(
-                                        SId, SubChId, StartAddr, BitRate, SubChSz, ProtLvl, 0, Protection::UEP
+                                        SId,
+                                        SubChId,
+                                        StartAddr,
+                                        BitRate,
+                                        SubChSz,
+                                        ProtLvl,
+                                        0,
+                                        Protection::UEP,
                                     );
                                 }
                             }
@@ -291,7 +303,14 @@ impl Ensemble {
                         } => {
                             if let Some(SId) = self.find_service_for_subchannel(SubChId) {
                                 self.set_service_subchannel_info(
-                                    SId, SubChId, StartAddr, 0, SubChSz, ProtLvl, Opt, Protection::EEP
+                                    SId,
+                                    SubChId,
+                                    StartAddr,
+                                    0,
+                                    SubChSz,
+                                    ProtLvl,
+                                    Opt,
+                                    Protection::EEP,
                                 );
                             }
                         }
