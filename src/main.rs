@@ -62,6 +62,7 @@ fn go(rx: Receiver<Buffer>, source: &impl Source) {
                             ens.add_fig(fig);
                         }
                         ens.display();
+                        println!("complete? {:?}", ens.is_complete());
                     }
                 }
             }

@@ -22,7 +22,8 @@ pub struct SubChannel {
     start: u16,
     bitrate: u16,
     size: u16,
-    prot: u8,
+    protlvl: u8,
+    prot: Protection,
 }
 
 pub struct DataSubChannel {
@@ -31,13 +32,21 @@ pub struct DataSubChannel {
     primary: bool,
     start: u16,
     size: u16,
-    prot: u8,
+    protlvl: u8,
     opt: u8,
     scca_flag: u8,
     dg: u8,
     dscty: u8,
     packet_addr: u16,
     scca: u16,
+    prot: Protection,
+}
+
+#[derive(Debug)]
+pub enum Protection {
+    Unknown,
+    EEP,
+    UEP,
 }
 
 pub fn new_ensemble() -> Ensemble {
@@ -64,7 +73,8 @@ pub fn new_subchannel(id: u8, primary: bool) -> SubChannel {
         start: 0,
         bitrate: 0,
         size: 0,
-        prot: 0,
+        protlvl: 0,
+        prot: Protection::Unknown,
     }
 }
 
@@ -75,13 +85,14 @@ pub fn new_data_subchannel(id: u16, primary: bool) -> DataSubChannel {
         subchid: 0,
         start: 0,
         size: 0,
-        prot: 0,
+        protlvl: 0,
         opt: 0,
         scca_flag: 0,
         dg: 0,
         dscty: 0,
         packet_addr: 0,
         scca: 0,
+        prot: Protection::Unknown,
     }
 }
 
@@ -153,6 +164,38 @@ static uep: [(u16, u16, u8); 64] = [
 ];
 
 impl Ensemble {
+
+    pub fn is_complete(&self) -> bool {
+        self.services_labelled() && self.subchannels_contiguous()
+    }
+
+    fn services_labelled(&self) -> bool {
+        self.services.values().map(|s| s.name.as_str() ).all(|n| n != "Unknown")
+    }
+
+    fn subchannels_contiguous(&self) -> bool {
+        let subchannels = self.services.values()
+            .flat_map(|s| s.subchannels.values() )
+            .map(|sc| (sc.start, sc.size));
+
+        let data_subchannels = self.services.values()
+            .flat_map(|s| s.data_subchannels.values())
+            .map(|dsc| (dsc.start, dsc.size));
+
+        let all = subchannels.chain(data_subchannels);
+
+        !all
+            .sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
+            .scan(0u16, |state, sc| {
+                if sc.0 != *state {
+                    return Some(u16::MAX);
+                }
+                *state += if sc.1 == 0 { 1 } else { sc.1 };
+                Some(sc.0)
+            })
+            .any(|start| start == u16::MAX)
+    }
+
     pub fn display(&self) {
         println!("Ensemble:");
         println!("{:16} (0x{:04x})", self.name, self.id);
@@ -164,14 +207,15 @@ impl Ensemble {
             for subchannel in service.subchannels.values() {
                 let PS = if subchannel.primary { "Pri" } else { "Sec " };
                 println!(
-                    "{:16} (0x{:04x}) {} subch={} start={} size={} bitrate={}",
+                    "{:16} (0x{:04x}) {} subch={} start={} size={} bitrate={} {:?}",
                     service.name,
                     service.id,
                     PS,
                     subchannel.id,
                     subchannel.start,
                     subchannel.size,
-                    subchannel.bitrate
+                    subchannel.bitrate,
+                    subchannel.prot
                 );
             }
             for data_subchannel in service.data_subchannels.values() {
@@ -181,7 +225,7 @@ impl Ensemble {
                     "Sec "
                 };
                 println!(
-                    "{:16} (0x{:04x}) {} subch={} SCId={} start={} size={} addr={}",
+                    "{:16} (0x{:04x}) {} subch={} SCId={} start={} size={} addr={} {:?}",
                     service.name,
                     service.id,
                     PS,
@@ -189,7 +233,8 @@ impl Ensemble {
                     data_subchannel.id,
                     data_subchannel.start,
                     data_subchannel.size,
-                    data_subchannel.packet_addr
+                    data_subchannel.packet_addr,
+                    data_subchannel.prot
                 );
             }
         }
@@ -232,7 +277,7 @@ impl Ensemble {
                                 if TabIndx < 64 {
                                     let (BitRate, SubChSz, ProtLvl) = uep[TabIndx as usize];
                                     self.set_service_subchannel_info(
-                                        SId, SubChId, StartAddr, BitRate, SubChSz, ProtLvl, 0,
+                                        SId, SubChId, StartAddr, BitRate, SubChSz, ProtLvl, 0, Protection::UEP
                                     );
                                 }
                             }
@@ -246,7 +291,7 @@ impl Ensemble {
                         } => {
                             if let Some(SId) = self.find_service_for_subchannel(SubChId) {
                                 self.set_service_subchannel_info(
-                                    SId, SubChId, StartAddr, 0, SubChSz, ProtLvl, Opt,
+                                    SId, SubChId, StartAddr, 0, SubChSz, ProtLvl, Opt, Protection::EEP
                                 );
                             }
                         }
@@ -326,14 +371,16 @@ impl Ensemble {
         start: u16,
         bitrate: u16,
         size: u16,
-        prot: u8,
+        protlvl: u8,
         opt: u8,
+        prot: Protection,
     ) {
         if let Some(service) = self.services.get_mut(&service_id) {
             if let Some(subchannel) = service.subchannels.get_mut(&subchannel_id) {
                 subchannel.start = start;
                 subchannel.bitrate = bitrate;
                 subchannel.size = size;
+                subchannel.protlvl = protlvl;
                 subchannel.prot = prot;
                 return;
             }
@@ -341,8 +388,9 @@ impl Ensemble {
                 if data_subchannel.subchid == subchannel_id {
                     data_subchannel.start = start;
                     data_subchannel.size = size;
-                    data_subchannel.prot = prot;
+                    data_subchannel.protlvl = protlvl;
                     data_subchannel.opt = opt;
+                    data_subchannel.prot = prot;
                     return;
                 }
             }
