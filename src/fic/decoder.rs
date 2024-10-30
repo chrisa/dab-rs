@@ -99,8 +99,7 @@ impl FastInformationChannelDecoder {
         &self,
         frame: &FastInformationChannelFrame,
     ) -> Result<Vec<FastInformationBlock>, &'static str> {
-        // dbg!(&frame);
-        let mut merged: [u8; 9216] = [0u8; 9216];
+        let mut merged: [bool; 9216] = [false; 9216];
 
         for (i, sym) in frame.bytes.iter().enumerate() {
             let mut bits = bytes_to_bits(sym);
@@ -110,8 +109,8 @@ impl FastInformationChannelDecoder {
             merged[(i * 3072)..((i + 1) * 3072)].copy_from_slice(&bits);
         }
 
-        let mut split = [0u8; 2304];
-        let mut fibs: [[u8; 256]; 12] = [[0; 256]; 12];
+        let mut split = [false; 2304];
+        let mut fibs: [[bool; 256]; 12] = [[false; 256]; 12];
 
         for i in 0..4 {
             split.copy_from_slice(&merged[(i * 2304)..((i + 1) * 2304)]);

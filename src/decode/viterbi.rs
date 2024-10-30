@@ -32,11 +32,10 @@ fn normal(x: f64) -> f64 {
     0.5 + 0.5 * erf(x / SQRT_2)
 }
 
-fn map_symbol(bit: u8) -> usize {
+fn map_symbol(bit: bool) -> usize {
     match bit {
-        1 => 129,
-        0 => 127,
-        _ => 128,
+        true => 129,
+        false => 127,
     }
 }
 
@@ -132,8 +131,8 @@ impl Viterbi {
         }
     }
 
-    pub fn frequency_deinterleave(&self, bits: [u8; 3072]) -> [u8; 3072] {
-        let mut slice = [0u8; 3072];
+    pub fn frequency_deinterleave(&self, bits: [bool; 3072]) -> [bool; 3072] {
+        let mut slice = [false; 3072];
         let k1 = 1536;
         for i in 0..k1 {
             let mut k = self.table49[i as usize];
@@ -153,8 +152,8 @@ impl Viterbi {
         slice
     }
 
-    pub fn viterbi(&self, bits: [u8; 3096]) -> [u8; 768] {
-        let mut result = [0u8; 768];
+    pub fn viterbi(&self, bits: [bool; 3096]) -> [bool; 768] {
+        let mut result = [false; 768];
         let symbols = bits.map(map_symbol);
 
         let mut bitcnt = -(K - 1);
@@ -194,7 +193,7 @@ impl Viterbi {
                 *met = 0;
                 for j in 0..N as usize {
                     *met += self.metrics[(i >> (N as usize - j - 1)) & 1]
-                        [symbols[symbol_offset + j]] as i32;
+                    [symbols[symbol_offset + j]] as i32;
                 }
             }
 
@@ -251,7 +250,7 @@ impl Viterbi {
                 != 0
             {
                 endstate |= 1 << (K - 1);
-                result[i] = 1;
+                result[i] = true;
             }
             endstate >>= 1;
         }
