@@ -104,8 +104,8 @@ impl FastInformationChannelDecoder {
         for (i, sym) in frame.bytes.iter().enumerate() {
             let mut bits = bytes_to_bits(sym);
             bit_reverse(&mut bits);
-            let bits = self.viterbi.frequency_deinterleave(bits);
-            let bits = qpsk_symbol_demapper(bits);
+            let bits = self.viterbi.frequency_deinterleave(&bits);
+            let bits = qpsk_symbol_demapper(&bits);
             merged[(i * 3072)..((i + 1) * 3072)].copy_from_slice(&bits);
         }
 
@@ -114,9 +114,9 @@ impl FastInformationChannelDecoder {
 
         for i in 0..4 {
             split.copy_from_slice(&merged[(i * 2304)..((i + 1) * 2304)]);
-            let depunctured = depuncture(split);
-            let viterbied = self.viterbi.viterbi(depunctured);
-            let scrambled = scramble(viterbied);
+            let depunctured = depuncture(&split);
+            let viterbied = self.viterbi.viterbi(&depunctured);
+            let scrambled = scramble(&viterbied);
             // Split into FIBs
             for j in 0..3 {
                 fibs[i * 3 + j].copy_from_slice(&scrambled[(j * 256)..(j * 256 + 256)]);

@@ -10,18 +10,15 @@ const LOGLONGBITS: i32 = 5;
 const D: i32 = 1 << (K - LOGLONGBITS - 1);
 
 pub struct Viterbi {
-    metrics: Box<[[i32; 256]; 2]>,
     table49: Box<[i32; 2048]>,
     syms: Box<[usize; 1 << K]>,
 }
 
 pub fn new_viterbi() -> Viterbi {
     let mut v = Viterbi {
-        metrics: Box::new([[0; 256]; 2]),
         table49: Box::new([0; 2048]),
         syms: Box::new([0; 1 << K]),
     };
-    v.gen_metrics();
     v.gen_table49();
     v.vd_init();
     v
@@ -30,13 +27,6 @@ pub fn new_viterbi() -> Viterbi {
 // Normal function integrated from -Inf to x. Range: 0-1
 fn normal(x: f64) -> f64 {
     0.5 + 0.5 * erf(x / SQRT_2)
-}
-
-fn map_symbol(bit: bool) -> usize {
-    match bit {
-        true => 129,
-        false => 127,
-    }
 }
 
 fn parity(i: usize) -> usize {
@@ -72,48 +62,6 @@ impl Viterbi {
         }
     }
 
-    fn gen_metrics(&mut self) {
-        let amp: f64 = 1.0;
-        let noise: f64 = 1.0;
-        let bias: f64 = 0.0;
-        let scale: f64 = 4.0;
-
-        let mut metrics: [[f64; 256]; 2] = [[0.0; 256]; 2];
-
-        {
-            let p1 = normal(((0.0 - OFFSET + 0.5) / amp - 1.0) / noise);
-            let p0 = normal(((0.0 - OFFSET + 0.5) / amp + 1.0) / noise);
-            metrics[0][0] = (2.0 * p0 / (p1 + p0)).log2() - bias;
-            metrics[1][0] = (2.0 * p1 / (p1 + p0)).log2() - bias;
-        }
-
-        for s in 1..255 {
-            let p1 = normal(((s as f64 - OFFSET + 0.5) / amp - 1.0) / noise)
-                - normal(((s as f64 - OFFSET - 0.5) / amp - 1.0) / noise);
-            let p0 = normal(((s as f64 - OFFSET + 0.5) / amp + 1.0) / noise)
-                - normal(((s as f64 - OFFSET - 0.5) / amp + 1.0) / noise);
-            metrics[0][s] = (2.0 * p0 / (p1 + p0)).log2() - bias;
-            metrics[1][s] = (2.0 * p1 / (p1 + p0)).log2() - bias;
-        }
-
-        {
-            let p1 = 1.0 - normal(((255.0 - OFFSET - 0.5) / amp - 1.0) / noise);
-            let p0 = 1.0 - normal(((255.0 - OFFSET - 0.5) / amp + 1.0) / noise);
-            metrics[0][255] = (2.0 * p0 / (p1 + p0)).log2() - bias;
-            metrics[1][255] = (2.0 * p1 / (p1 + p0)).log2() - bias;
-        }
-
-        for (i, bit) in metrics.iter().enumerate() {
-            for (j, s) in bit.iter().enumerate() {
-                self.metrics[i][j] = match (s * scale + 0.5).floor() {
-                    x if x.is_nan() => i32::MIN,
-                    f64::NEG_INFINITY => i32::MIN,
-                    other => other as i32,
-                };
-            }
-        }
-    }
-
     fn gen_table49(&mut self) {
         let mut KI: [i32; 2048] = [0; 2048];
 
@@ -131,8 +79,9 @@ impl Viterbi {
         }
     }
 
-    pub fn frequency_deinterleave(&self, bits: [bool; 3072]) -> [bool; 3072] {
-        let mut slice = [false; 3072];
+    pub fn frequency_deinterleave(&self, bits: &[bool]) -> Vec<bool> {
+        let mut slice = vec!();
+        slice.resize(bits.len(), false);
         let k1 = 1536;
         for i in 0..k1 {
             let mut k = self.table49[i as usize];
@@ -152,9 +101,11 @@ impl Viterbi {
         slice
     }
 
-    pub fn viterbi(&self, bits: [bool; 3096]) -> [bool; 768] {
-        let mut result = [false; 768];
-        let symbols = bits.map(map_symbol);
+    pub fn viterbi(&self, bits: &[bool]) -> Vec<bool> {
+        assert!(bits.len() == 3096);
+        
+        let mut result = vec!();
+        result.resize(768,false);
 
         let mut bitcnt = -(K - 1);
 
@@ -186,14 +137,16 @@ impl Viterbi {
         let mut path_offset: usize = 0;
         let mut symbol_offset: usize = 0;
 
+        let metrics = [[3, -7], [-7, 3]];
+
         loop {
             /* For each data bit */
             /* Read input symbols and compute branch metrics */
             for (i, met) in mets.iter_mut().enumerate().take(1 << N) {
                 *met = 0;
                 for j in 0..N as usize {
-                    *met += self.metrics[(i >> (N as usize - j - 1)) & 1]
-                    [symbols[symbol_offset + j]] as i32;
+                    *met += metrics[(i >> (N as usize - j - 1)) & 1]
+                        [if bits[symbol_offset + j] { 1 } else { 0 }];
                 }
             }
 

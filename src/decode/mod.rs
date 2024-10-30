@@ -5,18 +5,19 @@ pub use viterbi::Viterbi;
 
 const K: i32 = 1536;
 
-pub fn bit_reverse(bits: &mut [bool; 3072]) {
+pub fn bit_reverse(bits: &mut [bool]) {
+    assert!(bits.len() % 16 == 0);
     for chunk in bits.chunks_mut(16) {
         chunk.reverse();
     }
 }
 
-pub fn bytes_to_bits(bytes: &[u8; 384]) -> [bool; 3072] {
-    let mut bits = [false; 3072];
+pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
+    let mut bits = vec!();
 
-    for i in 0..384 {
+    for byte in bytes {
         for j in 0..8 {
-            bits[i * 8 + j] = ((bytes[i] >> j) & 1) != 0;
+            bits.push(((byte >> j) & 1) != 0);
         }
     }
 
@@ -24,7 +25,11 @@ pub fn bytes_to_bits(bytes: &[u8; 384]) -> [bool; 3072] {
 }
 
 fn byte(b: bool) -> u8 {
-    if b { 1 } else { 0 }
+    if b {
+        1
+    } else {
+        0
+    }
 }
 
 pub fn bits_to_bytes(bits: &[bool; 256]) -> [u8; 30] {
@@ -45,8 +50,9 @@ pub fn bits_to_bytes(bits: &[bool; 256]) -> [u8; 30] {
     result
 }
 
-pub fn qpsk_symbol_demapper(bits: [bool; 3072]) -> [bool; 3072] {
-    let mut slice = [false; 3072];
+pub fn qpsk_symbol_demapper(bits: &[bool]) -> Vec<bool> {
+    let mut slice = vec!();
+    slice.resize(bits.len(), false);
 
     for n in 0..K as usize {
         slice[n] = bits[2 * n];
@@ -56,13 +62,14 @@ pub fn qpsk_symbol_demapper(bits: [bool; 3072]) -> [bool; 3072] {
     slice
 }
 
-pub fn depuncture(bits: [bool; 2304]) -> [bool; 3096] {
+pub fn depuncture(bits: &[bool; 2304]) -> Vec<bool> {
     // 21 blocks, using puncture 1110 1110 1110 1110 1110 1110 1110 1110
     //  3 blocks, using puncture 1110 1110 1110 1110 1110 1110 1110 1100
     // 24 bits,   using puncture 1100 1100 1100 1100 1100 1100
     let mut i: usize = 0;
     let mut k: usize = 0;
-    let mut result = [false; 3096];
+    let mut result = vec!();
+    result.resize(3096, false);
 
     loop {
         for j in 0..8 {
@@ -164,16 +171,16 @@ pub fn depuncture(bits: [bool; 2304]) -> [bool; 3096] {
 //10 Energy dispersal
 //10.1 General procedure
 //10.2 Energy dispersal as applied in the Fast Information Channel
-pub fn scramble(bits: [bool; 768]) -> [bool; 768] {
+pub fn scramble(bits: &[bool]) -> Vec<bool> {
     let mut v: u16 = 0x1ff;
-    let mut result = [false; 768];
+    let mut result = vec!();
 
-    for i in 0..768 {
+    for bit in bits {
         v <<= 1;
         let v0 = ((v >> 9) & 1) ^ ((v >> 5) & 1);
         v |= v0;
 
-        result[i] = bits[i] ^ ((v0 & 1) != 0);
+        result.push(bit ^ ((v0 & 1) != 0));
     }
 
     result
