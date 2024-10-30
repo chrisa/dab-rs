@@ -1,6 +1,9 @@
+#![allow(dead_code)]
+#![allow(unused_variables)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(clippy::upper_case_acronyms)]
 
 mod decode;
 mod fic;
@@ -61,8 +64,9 @@ fn go(rx: Receiver<Buffer>, source: &impl Source) {
                         for fig in figs {
                             ens.add_fig(fig);
                         }
-                        ens.display();
-                        println!("complete? {:?}", ens.is_complete());
+                        if ens.is_complete() {
+                            ens.display();
+                        }
                     }
                 }
             }

@@ -8,6 +8,8 @@ pub mod fig;
 
 pub use decoder::new_decoder;
 
+use pretty_hex::*;
+
 const FIC_BUFFER: usize = 384;
 
 #[derive(Debug, Copy, Clone)]
@@ -55,9 +57,7 @@ impl fmt::Debug for FastInformationChannelFrame {
                 )
                 .as_str(),
             );
-            for byte in buffer.iter().take(FIC_BUFFER) {
-                s.push_str(format!("{:02x} ", byte).as_str());
-            }
+            s.push_str(&pretty_hex(&buffer));
         }
         s.push('\n');
         write!(f, "{}", s)

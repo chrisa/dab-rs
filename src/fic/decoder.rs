@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use pretty_hex::*;
 use std::fmt;
 
 use crate::{
@@ -98,6 +99,7 @@ impl FastInformationChannelDecoder {
         &self,
         frame: &FastInformationChannelFrame,
     ) -> Result<Vec<FastInformationBlock>, &'static str> {
+        // dbg!(&frame);
         let mut merged: [u8; 9216] = [0u8; 9216];
 
         for (i, sym) in frame.bytes.iter().enumerate() {
@@ -145,6 +147,8 @@ impl FastInformationChannelDecoder {
     }
 
     pub fn extract_figs(&self, fib: &FastInformationBlock) -> Vec<Fig> {
+        println!("fib num: {:?}\n{}", fib.num, pretty_hex(&fib.bytes));
+
         let fig_iter = fib.bytes.iter().batching(|it| {
             if let Some(h) = it.next() {
                 // end marker

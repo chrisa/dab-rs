@@ -165,7 +165,7 @@ static uep: [(u16, u16, u8); 64] = [
 
 impl Ensemble {
     pub fn is_complete(&self) -> bool {
-        self.services_labelled() && self.subchannels_contiguous()
+        !self.services.is_empty() && self.services_labelled() && self.subchannels_contiguous()
     }
 
     fn services_labelled(&self) -> bool {

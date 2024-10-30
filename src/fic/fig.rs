@@ -1,6 +1,7 @@
 use bitvec::{
     field::BitField,
     order::{Lsb0, Msb0},
+    slice::BitSlice,
     view::BitView,
 };
 use core::fmt::Debug;
@@ -199,7 +200,7 @@ impl Type0 {
     }
 
     fn ensemble(pd: u8, bytes: &[u8]) -> Vec<Information> {
-        // assert!(bytes.len() == 5);
+        assert!(bytes.len() == 4);
         let data = bytes.view_bits::<Lsb0>();
         let EId: u16 = data[0..16].load_be();
         let ChgFlg: u8 = data[16..18].load_be();
@@ -371,32 +372,55 @@ fn label(bytes: Vec<u8>) -> String {
     .unwrap()
 }
 
+struct Type1Header<'a> {
+    bytes: &'a Vec<u8>,
+    bits: &'a BitSlice<u8>,
+}
+
+fn new_type1(bytes: &Vec<u8>) -> Type1Header {
+    Type1Header {
+        bits: bytes.view_bits::<Lsb0>(),
+        bytes,
+    }
+}
+
+impl<'a> Type1Header<'a> {
+    fn extn(&self) -> u8 {
+        self.bits[0..3].load_be()
+    }
+
+    fn oe(&self) -> u8 {
+        self.bits[3..4].load_be()
+    }
+
+    fn charset(&self) -> u8 {
+        self.bits[4..8].load_be()
+    }
+
+    fn pd(&self) -> u8 {
+        self.bits[15..16].load_be()
+    }
+
+    fn label(&self, offset: usize) -> String {
+        label(self.bytes[offset..offset + 16].to_vec())
+    }
+}
+
 impl Type1 {
     pub fn push_data(&mut self, bytes: Vec<u8>) {
-        let header = bytes[0].view_bits::<Lsb0>();
-        let extn: u8 = header[0..3].load_be();
-        let oe: u8 = header[3..4].load_be();
-        let charset: u8 = header[4..8].load_be();
-        self.purpose = match extn {
+        let header = new_type1(&bytes);
+        self.purpose = match header.extn() {
             0 => Type1::ensemble(&bytes),
             1 => Type1::programme_service(&bytes),
             4 => Type1::service_component(&bytes),
             5 => Type1::data_service(&bytes),
             _ => LabelPurpose::Unknown,
         };
-        self.label = match extn {
-            0 => label(bytes[3..19].to_vec()),
-            1 => label(bytes[3..19].to_vec()),
-            4 => {
-                let data = bytes[1].view_bits::<Lsb0>();
-                let PD: u8 = data[7..8].load_be();
-                if PD != 0 {
-                    label(bytes[6..22].to_vec())
-                } else {
-                    label(bytes[4..20].to_vec())
-                }
-            }
-            5 => label(bytes[5..21].to_vec()),
+        self.label = match header.extn() {
+            0 => header.label(3),
+            1 => header.label(3),
+            4 => header.label(if header.pd() != 0 { 6 } else { 4 }),
+            5 => header.label(5),
             _ => "".to_owned(),
         };
     }

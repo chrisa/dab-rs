@@ -13,6 +13,7 @@ libm = "0.2.8"
 rustfft = "6.2.0"
 clap = { version = "4.5.20", features = ["derive"] }
 itertools = "0.13.0"
+pretty-hex = "0.4.1"
 
 [profile.release]
 debug = true
