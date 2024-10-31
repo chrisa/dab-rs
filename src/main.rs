@@ -72,8 +72,9 @@ fn go(rx: Receiver<Buffer>, source: &impl Source, service_name: &str) {
         msc(&rx, service);
         t.join().unwrap();
     }
-
-    println!("Service '{}' not found in ensemble", &service_name);
+    else {
+        println!("Service '{}' not found in ensemble", &service_name);
+    }
 }
 
 fn fic(rx: &Receiver<Buffer>, service_name: &str) -> Ensemble {
