@@ -163,9 +163,17 @@ static uep: [(u16, u16, u8); 64] = [
     (384, 416, 1),
 ];
 
+fn service_name_matches(a: &str, b: &str) -> bool {
+    a.trim_end() == b
+}
+
 impl Ensemble {
     pub fn is_complete(&self) -> bool {
-        !self.services.is_empty() && self.services_labelled() && self.subchannels_contiguous()
+        !self.services.is_empty() && self.services_labelled() && self.subchannels_contiguous() && self.ensemble_labelled()
+    }
+
+    pub fn find_service(&self, name: &str) -> Option<&Service> {
+        self.services.values().find(|s| service_name_matches(&s.name, name))
     }
 
     fn services_labelled(&self) -> bool {
@@ -173,6 +181,10 @@ impl Ensemble {
             .values()
             .map(|s| s.name.as_str())
             .all(|n| n != "Unknown")
+    }
+
+    fn ensemble_labelled(&self) -> bool {
+        self.name != "Unknown"
     }
 
     fn subchannels_contiguous(&self) -> bool {

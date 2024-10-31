@@ -31,6 +31,9 @@ enum CliSource {
 struct Cli {
     #[clap(value_enum, default_value_t=CliSource::Wavefinder)]
     source: CliSource,
+    #[arg(short, long)]
+    service: String,
+    #[arg(short, long)]
     file: Option<std::path::PathBuf>,
 }
 
@@ -42,15 +45,19 @@ fn main() {
         go(
             rx,
             &source::wavefinder::new_wavefinder_source(tx, args.file),
+            &args.service
         );
     } else if args.source == CliSource::File {
-        go(rx, &source::file::new_file_source(tx, args.file));
+        go(rx, &source::file::new_file_source(tx, args.file), &args.service);
     }
 }
 
-fn go(rx: Receiver<Buffer>, source: &impl Source) {
+fn go(rx: Receiver<Buffer>, source: &impl Source, service_name: &str) {
     let mut fic_decoder = fic::new_decoder();
     let mut ens = new_ensemble();
+
+    let service_name = service_name.to_owned();
+    let mut found_service = false;
 
     let t = thread::spawn(move || {
         while let Ok(buffer) = rx.recv() {
@@ -64,8 +71,12 @@ fn go(rx: Receiver<Buffer>, source: &impl Source) {
                         for fig in figs {
                             ens.add_fig(fig);
                         }
-                        if ens.is_complete() {
+                        if !found_service && ens.is_complete() {
                             ens.display();
+                            if let Some(service) = ens.find_service(&service_name) {
+                                println!("found {}", &service_name);
+                                found_service = true;
+                            }
                         }
                     }
                 }

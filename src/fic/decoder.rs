@@ -146,7 +146,7 @@ impl FastInformationChannelDecoder {
     }
 
     pub fn extract_figs(&self, fib: &FastInformationBlock) -> Vec<Fig> {
-        println!("fib num: {:?}\n{}", fib.num, pretty_hex(&fib.bytes));
+        // println!("fib num: {:?}\n{}", fib.num, pretty_hex(&fib.bytes));
 
         let fig_iter = fib.bytes.iter().batching(|it| {
             if let Some(h) = it.next() {
