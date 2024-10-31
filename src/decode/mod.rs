@@ -13,7 +13,7 @@ pub fn bit_reverse(bits: &mut [bool]) {
 }
 
 pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
-    let mut bits = vec!();
+    let mut bits = vec![];
 
     for byte in bytes {
         for j in 0..8 {
@@ -51,7 +51,7 @@ pub fn bits_to_bytes(bits: &[bool; 256]) -> [u8; 30] {
 }
 
 pub fn qpsk_symbol_demapper(bits: &[bool]) -> Vec<bool> {
-    let mut slice = vec!();
+    let mut slice = vec![];
     slice.resize(bits.len(), false);
 
     for n in 0..K as usize {
@@ -68,7 +68,7 @@ pub fn depuncture(bits: &[bool; 2304]) -> Vec<bool> {
     // 24 bits,   using puncture 1100 1100 1100 1100 1100 1100
     let mut i: usize = 0;
     let mut k: usize = 0;
-    let mut result = vec!();
+    let mut result = vec![];
     result.resize(3096, false);
 
     loop {
@@ -173,7 +173,7 @@ pub fn depuncture(bits: &[bool; 2304]) -> Vec<bool> {
 //10.2 Energy dispersal as applied in the Fast Information Channel
 pub fn scramble(bits: &[bool]) -> Vec<bool> {
     let mut v: u16 = 0x1ff;
-    let mut result = vec!();
+    let mut result = vec![];
 
     for bit in bits {
         v <<= 1;

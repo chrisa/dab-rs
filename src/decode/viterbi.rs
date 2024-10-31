@@ -80,7 +80,7 @@ impl Viterbi {
     }
 
     pub fn frequency_deinterleave(&self, bits: &[bool]) -> Vec<bool> {
-        let mut slice = vec!();
+        let mut slice = vec![];
         slice.resize(bits.len(), false);
         let k1 = 1536;
         for i in 0..k1 {
@@ -103,9 +103,9 @@ impl Viterbi {
 
     pub fn viterbi(&self, bits: &[bool]) -> Vec<bool> {
         assert!(bits.len() == 3096);
-        
-        let mut result = vec!();
-        result.resize(768,false);
+
+        let mut result = vec![];
+        result.resize(768, false);
 
         let mut bitcnt = -(K - 1);
 

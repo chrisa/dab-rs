@@ -169,11 +169,16 @@ fn service_name_matches(a: &str, b: &str) -> bool {
 
 impl Ensemble {
     pub fn is_complete(&self) -> bool {
-        !self.services.is_empty() && self.services_labelled() && self.subchannels_contiguous() && self.ensemble_labelled()
+        !self.services.is_empty()
+            && self.services_labelled()
+            && self.subchannels_contiguous()
+            && self.ensemble_labelled()
     }
 
     pub fn find_service(&self, name: &str) -> Option<&Service> {
-        self.services.values().find(|s| service_name_matches(&s.name, name))
+        self.services
+            .values()
+            .find(|s| service_name_matches(&s.name, name))
     }
 
     fn services_labelled(&self) -> bool {

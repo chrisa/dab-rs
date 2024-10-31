@@ -45,10 +45,14 @@ fn main() {
         go(
             rx,
             &source::wavefinder::new_wavefinder_source(tx, args.file),
-            &args.service
+            &args.service,
         );
     } else if args.source == CliSource::File {
-        go(rx, &source::file::new_file_source(tx, args.file), &args.service);
+        go(
+            rx,
+            &source::file::new_file_source(tx, args.file),
+            &args.service,
+        );
     }
 }
 
