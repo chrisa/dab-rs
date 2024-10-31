@@ -13,13 +13,13 @@ mod prs;
 mod source;
 mod wavefinder;
 
-use std::{
-    sync::mpsc::{self, Receiver},
-    thread,
-};
+use std::sync::mpsc::{self, Receiver};
 
 use clap::Parser;
-use fic::{ensemble::new_ensemble, FastInformationChannelBuffer};
+use fic::{
+    ensemble::{new_ensemble, Ensemble, Service},
+    FastInformationChannelBuffer,
+};
 use msc::cif::channel_symbols;
 use source::Source;
 use wavefinder::Buffer;
@@ -60,38 +60,54 @@ fn main() {
 }
 
 fn go(rx: Receiver<Buffer>, source: &impl Source, service_name: &str) {
+    let t = source.run();
+
+    // FIC
+    let ens = fic(&rx, service_name);
+    ens.display();
+
+    // If service, MSC
+    if let Some(service) = ens.find_service(service_name) {
+        println!("Service '{}' found, playing", &service_name);
+        msc(&rx, service);
+        t.join().unwrap();
+    }
+
+    println!("Service '{}' not found in ensemble", &service_name);
+}
+
+fn fic(rx: &Receiver<Buffer>, service_name: &str) -> Ensemble {
     let mut fic_decoder = fic::new_decoder();
     let mut ens = new_ensemble();
-
     let service_name = service_name.to_owned();
-    let mut found_service = false;
 
-    let t = thread::spawn(move || {
-        while let Ok(buffer) = rx.recv() {
-            if buffer.last {
-                break;
-            }
-            if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
-                if let Some(fibs) = fic_decoder.try_buffer(fic_buffer) {
-                    for fib in fibs {
-                        let figs = fic_decoder.extract_figs(&fib);
-                        for fig in figs {
-                            ens.add_fig(fig);
-                        }
-                        if !found_service && ens.is_complete() {
-                            ens.display();
-                            if let Some(service) = ens.find_service(&service_name) {
-                                println!("found {}", &service_name);
-                                found_service = true;
-                                dbg!(channel_symbols(service));
-                            }
-                        }
+    while let Ok(buffer) = rx.recv() {
+        if buffer.last {
+            break;
+        }
+        if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
+            if let Some(fibs) = fic_decoder.try_buffer(fic_buffer) {
+                for fib in fibs {
+                    let figs = fic_decoder.extract_figs(&fib);
+                    for fig in figs {
+                        ens.add_fig(fig);
                     }
+                }
+                if ens.is_complete() {
+                    break;
                 }
             }
         }
-    });
+    }
+    ens
+}
 
-    source.run();
-    t.join().unwrap();
+fn msc(rx: &Receiver<Buffer>, service: &Service) {
+    dbg!(channel_symbols(service));
+    while let Ok(buffer) = rx.recv() {
+        if buffer.last {
+            break;
+        }
+        // dbg!(buffer);
+    }
 }

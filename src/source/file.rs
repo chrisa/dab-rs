@@ -1,4 +1,10 @@
-use std::{fs::File, io::BufReader, path::PathBuf, sync::mpsc::Sender};
+use std::{
+    fs::File,
+    io::BufReader,
+    path::PathBuf,
+    sync::mpsc::Sender,
+    thread::{self, JoinHandle},
+};
 
 use crate::wavefinder::Buffer;
 
@@ -14,32 +20,34 @@ pub fn new_file_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> impl Source
 }
 
 impl Source for FileSource {
-    fn run(&self) {
-        let mut buf;
+    fn run(&self) -> JoinHandle<()> {
         let path = self.path.clone();
-        if let Some(p) = path {
-            let file = File::open(&p);
-            if let Ok(f) = file {
-                buf = BufReader::new(f);
+        let tx = self.tx.clone();
+        thread::spawn(move || {
+            let mut buf;
+            if let Some(p) = path {
+                let file = File::open(&p);
+                if let Ok(f) = file {
+                    buf = BufReader::new(f);
+                } else {
+                    panic!("file couldn't be opened {:?}", p);
+                }
             } else {
-                panic!("file couldn't be opened {:?}", p);
+                panic!("no file specified");
             }
-        } else {
-            panic!("no file specified");
-        }
 
-        loop {
-            let result = Buffer::read_from_file(&mut buf);
-            let Ok(buffer) = result else {
-                self.tx
-                    .send(Buffer {
+            loop {
+                let result = Buffer::read_from_file(&mut buf);
+                let Ok(buffer) = result else {
+                    tx.send(Buffer {
                         bytes: [0; 524],
                         last: true,
                     })
                     .unwrap();
-                break;
-            };
-            self.tx.send(buffer).unwrap();
-        }
+                    break;
+                };
+                tx.send(buffer).unwrap();
+            }
+        })
     }
 }
