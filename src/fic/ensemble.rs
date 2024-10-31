@@ -12,11 +12,11 @@ pub struct Ensemble {
 pub struct Service {
     id: u32,
     name: String,
-    subchannels: HashMap<u8, SubChannel>,
+    audio_subchannels: HashMap<u8, AudioSubChannel>,
     data_subchannels: HashMap<u16, DataSubChannel>,
 }
 
-pub struct SubChannel {
+pub struct AudioSubChannel {
     id: u8,
     primary: bool,
     start: u16,
@@ -61,13 +61,13 @@ pub fn new_service(id: u32) -> Service {
     Service {
         id,
         name: "Unknown".to_owned(),
-        subchannels: HashMap::new(),
+        audio_subchannels: HashMap::new(),
         data_subchannels: HashMap::new(),
     }
 }
 
-pub fn new_subchannel(id: u8, primary: bool) -> SubChannel {
-    SubChannel {
+pub fn new_subchannel(id: u8, primary: bool) -> AudioSubChannel {
+    AudioSubChannel {
         id,
         primary,
         start: 0,
@@ -196,7 +196,7 @@ impl Ensemble {
         let subchannels = self
             .services
             .values()
-            .flat_map(|s| s.subchannels.values())
+            .flat_map(|s| s.audio_subchannels.values())
             .map(|sc| (sc.start, sc.size));
 
         let data_subchannels = self
@@ -226,7 +226,7 @@ impl Ensemble {
             .values()
             .sorted_by(|a, b| Ord::cmp(&a.id, &b.id))
         {
-            for subchannel in service.subchannels.values() {
+            for subchannel in service.audio_subchannels.values() {
                 let PS = if subchannel.primary { "Pri" } else { "Sec " };
                 println!(
                     "{:16} (0x{:04x}) {} subch={} start={} size={} bitrate={} {:?}",
@@ -382,10 +382,10 @@ impl Ensemble {
         }
     }
 
-    pub fn add_service_subchannel(&mut self, service_id: u32, subchannel: SubChannel) {
+    pub fn add_service_subchannel(&mut self, service_id: u32, subchannel: AudioSubChannel) {
         if let Some(service) = self.services.get_mut(&service_id) {
             service
-                .subchannels
+                .audio_subchannels
                 .entry(subchannel.id)
                 .or_insert(subchannel);
         }
@@ -412,7 +412,7 @@ impl Ensemble {
         prot: Protection,
     ) {
         if let Some(service) = self.services.get_mut(&service_id) {
-            if let Some(subchannel) = service.subchannels.get_mut(&subchannel_id) {
+            if let Some(subchannel) = service.audio_subchannels.get_mut(&subchannel_id) {
                 subchannel.start = start;
                 subchannel.bitrate = bitrate;
                 subchannel.size = size;
@@ -458,7 +458,7 @@ impl Ensemble {
 
     pub fn find_service_for_subchannel(&self, SubChId: u8) -> Option<u32> {
         for service in self.services.values() {
-            for subchannel in service.subchannels.values() {
+            for subchannel in service.audio_subchannels.values() {
                 if subchannel.id == SubChId {
                     return Some(service.id);
                 }
@@ -481,5 +481,41 @@ impl Ensemble {
             }
         }
         None
+    }
+}
+
+impl Service {
+    // TODO; deal with more than one subchannel
+    pub fn subchannel(&self) -> &dyn SubChannel {
+        if let Some(subchannel) = self.audio_subchannels.values().next() {
+            return subchannel;
+        }
+        if let Some(subchannel) = self.data_subchannels.values().next() {
+            return subchannel;
+        }
+        panic!("no subchannels?");
+    }
+}
+
+pub trait SubChannel {
+    fn startaddr(&self) -> u16;
+    fn size(&self) -> u16;
+}
+
+impl SubChannel for AudioSubChannel {
+    fn startaddr(&self) -> u16 {
+        self.start
+    }
+    fn size(&self) -> u16 {
+        self.size
+    }
+}
+
+impl SubChannel for DataSubChannel {
+    fn startaddr(&self) -> u16 {
+        self.start
+    }
+    fn size(&self) -> u16 {
+        self.size
     }
 }

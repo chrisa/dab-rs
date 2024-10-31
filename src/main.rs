@@ -4,9 +4,11 @@
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
 #![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::too_many_arguments)]
 
 mod decode;
 mod fic;
+mod msc;
 mod prs;
 mod source;
 mod wavefinder;
@@ -18,6 +20,7 @@ use std::{
 
 use clap::Parser;
 use fic::{ensemble::new_ensemble, FastInformationChannelBuffer};
+use msc::cif::channel_symbols;
 use source::Source;
 use wavefinder::Buffer;
 
@@ -80,6 +83,7 @@ fn go(rx: Receiver<Buffer>, source: &impl Source, service_name: &str) {
                             if let Some(service) = ens.find_service(&service_name) {
                                 println!("found {}", &service_name);
                                 found_service = true;
+                                dbg!(channel_symbols(service));
                             }
                         }
                     }
