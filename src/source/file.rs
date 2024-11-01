@@ -6,7 +6,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::wavefinder::Buffer;
+use crate::{fic::ensemble::Service, wavefinder::Buffer};
 
 use super::Source;
 
@@ -15,8 +15,8 @@ pub struct FileSource {
     path: Option<PathBuf>,
 }
 
-pub fn new_file_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> impl Source {
-    FileSource { tx, path }
+pub fn new_file_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> Box<dyn Source> {
+    Box::new(FileSource { tx, path })
 }
 
 impl Source for FileSource {
@@ -49,5 +49,9 @@ impl Source for FileSource {
                 tx.send(buffer).unwrap();
             }
         })
+    }
+
+    fn select_service(&mut self, service: &Service) {
+        // no-op for file source
     }
 }

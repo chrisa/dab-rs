@@ -6,6 +6,8 @@ use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
 
+use crate::fic::ensemble::Service;
+use crate::msc::cif::channel_symbols;
 use crate::wavefinder::{Buffer, Wavefinder};
 use crate::{prs, wavefinder};
 
@@ -18,8 +20,8 @@ pub struct WavefinderSource {
     path: Option<PathBuf>,
 }
 
-pub fn new_wavefinder_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> impl Source {
-    WavefinderSource { tx, path }
+pub fn new_wavefinder_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> Box<dyn Source> {
+    Box::new(WavefinderSource { tx, path })
 }
 
 impl Source for WavefinderSource {
@@ -100,5 +102,9 @@ impl Source for WavefinderSource {
                 }
             }
         })
+    }
+
+    fn select_service(&mut self, service: &Service) {
+        dbg!(channel_symbols(service));
     }
 }
