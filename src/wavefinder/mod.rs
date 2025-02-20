@@ -63,7 +63,7 @@ unsafe extern "C" fn call_closure<F>(
     F: FnMut(Buffer),
 {
     let callback_ptr = data as *mut F;
-    let callback = &mut *callback_ptr;
+    let callback = unsafe { &mut *callback_ptr };
     let slice = unsafe { std::slice::from_raw_parts(buf, len) };
     if let Ok(bytes) = slice.try_into() {
         callback(Buffer { bytes, last: false });

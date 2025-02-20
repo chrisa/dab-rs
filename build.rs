@@ -18,6 +18,7 @@ fn main() {
     // to bindgen, and lets you build up options for
     // the resulting bindings.
     let bindings = bindgen::Builder::default()
+        .wrap_unsafe_ops(true)
         // The input header we would like to generate
         // bindings for.
         .header("src/wavefinder/wf_usb.h")

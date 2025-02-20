@@ -1,11 +1,11 @@
 [package]
 name = "dab-rs"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [build-dependencies]
-bindgen = "0.69.4"
-cc = "1.1.7"
+bindgen = "0.71.1"
+cc = "1.2.14"
 
 [dependencies]
 bitvec = "1"
