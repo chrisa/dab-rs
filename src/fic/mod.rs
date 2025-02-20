@@ -5,6 +5,7 @@ use crate::wavefinder::Buffer;
 pub mod decoder;
 pub mod ensemble;
 pub mod fig;
+mod figs;
 
 pub use decoder::new_decoder;
 

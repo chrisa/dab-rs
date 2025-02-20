@@ -7,6 +7,7 @@ use bitvec::{
     slice::BitSlice,
     view::BitView,
 };
+use modular_bitfield::prelude::*;
 use core::fmt::Debug;
 
 #[derive(Debug)]
@@ -101,30 +102,48 @@ pub enum ServiceComponent {
     },
 }
 
-#[derive(Debug)]
 pub struct Type1 {
     pub label: String,
-    pub purpose: LabelPurpose,
+    pub purpose: Box<dyn LabelPurpose>,
 }
 
-#[derive(Debug)]
-pub enum LabelPurpose {
-    Unknown,
-    Ensemble {
-        EId: u16,
-    },
-    ProgrammeService {
-        SId: u16,
-    },
-    DataService {
-        SId: u32,
-    },
-    ServiceComponent {
-        SId: u32,
-        PD: bool,
-        Rfa: u8,
-        SCIdS: u8,
-    },
+trait LabelPurpose {
+    fn from_slice(slice: &BitSlice<u8, Lsb0>) -> Self where Self: Sized;
+}
+
+#[bitfield]
+struct LabelPurposeEnsemble {
+    EId: B16,
+}
+
+#[bitfield]
+struct LabelPurposeProgrammeService {
+    SId: B16,
+}
+
+#[bitfield]
+struct LabelPurposeDataService {
+    SId: B32,
+}
+
+#[bitfield]
+struct LabelPurposeServiceComponent {
+    SId: B32,
+    PD: B1,
+    Rfa: B3,
+    SCIdS: B4,
+}
+
+impl LabelPurpose for LabelPurposeEnsemble {
+    fn from_slice(slice: &BitSlice<u8, Lsb0>) -> LabelPurposeEnsemble {
+        LabelPurposeEnsemble::from_bytes(slice.load_be::<u16>().to_be_bytes())
+    }
+}
+
+impl LabelPurpose for LabelPurposeProgrammeService {
+    fn from_slice(slice: &BitSlice<u8, Lsb0>) -> LabelPurposeProgrammeService {
+        LabelPurposeProgrammeService::from_bytes(slice.load_be::<u16>().to_be_bytes())
+    }
 }
 
 impl Fig {
@@ -180,7 +199,7 @@ fn fig_1(len: usize) -> Fig {
     Fig {
         header: FigHeader { figtype: 1, len },
         figtype: FigType::Type1(Type1 {
-            purpose: LabelPurpose::Unknown,
+            purpose: LabelPurposeUnknown,
             label: "".to_owned(),
         }),
     }
@@ -417,7 +436,7 @@ impl Type1 {
             1 => Type1::programme_service(&bytes),
             4 => Type1::service_component(&bytes),
             5 => Type1::data_service(&bytes),
-            _ => LabelPurpose::Unknown,
+            _ => LabelPurpose::LabelPurposeUnknown,
         };
         self.label = match header.extn() {
             0 => header.label(3),
@@ -428,16 +447,14 @@ impl Type1 {
         };
     }
 
-    fn ensemble(bytes: &[u8]) -> LabelPurpose {
+    fn ensemble(bytes: &[u8]) -> Box<LabelPurposeEnsemble> {
         let data = bytes[1..3].view_bits::<Lsb0>();
-        let eid = data[0..16].load_be();
-        LabelPurpose::Ensemble { EId: eid }
+        Box::new(LabelPurposeEnsemble::from_slice(data))
     }
 
-    fn programme_service(bytes: &[u8]) -> LabelPurpose {
+    fn programme_service(bytes: &[u8]) -> Box<LabelPurposeProgrammeService> {
         let data = bytes[1..3].view_bits::<Lsb0>();
-        let SId = data[0..16].load_be();
-        LabelPurpose::ProgrammeService { SId }
+        LabelPurposeProgrammeService::from_slice(data)
     }
 
     fn service_component(bytes: &[u8]) -> LabelPurpose {
@@ -452,7 +469,7 @@ impl Type1 {
             let data = bytes[2..4].view_bits::<Lsb0>();
             data[0..16].load_be()
         };
-        LabelPurpose::ServiceComponent {
+        LabelPurpose::LabelPurposeServiceComponent {
             SId,
             Rfa,
             SCIdS,
@@ -463,6 +480,6 @@ impl Type1 {
     fn data_service(bytes: &[u8]) -> LabelPurpose {
         let data = bytes[1..5].view_bits::<Lsb0>();
         let SId = data[0..32].load_be();
-        LabelPurpose::DataService { SId }
+        LabelPurpose::LabelPurposeDataService { SId }
     }
 }
