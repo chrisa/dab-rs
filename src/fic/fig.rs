@@ -377,7 +377,7 @@ struct Type1Header<'a> {
     bits: &'a BitSlice<u8>,
 }
 
-fn new_type1(bytes: &Vec<u8>) -> Type1Header {
+fn new_type1(bytes: &Vec<u8>) -> Type1Header<'_> {
     Type1Header {
         bits: bytes.view_bits::<Lsb0>(),
         bytes,
