@@ -295,8 +295,8 @@ impl Ensemble {
                             TabIndx,
                             ..
                         } => {
-                            if let Some(SId) = self.find_service_for_subchannel(SubChId) {
-                                if TabIndx < 64 {
+                            if let Some(SId) = self.find_service_for_subchannel(SubChId)
+                                && TabIndx < 64 {
                                     let (BitRate, SubChSz, ProtLvl) = uep[TabIndx as usize];
                                     self.set_service_subchannel_info(
                                         SId,
@@ -309,7 +309,6 @@ impl Ensemble {
                                         Protection::UEP,
                                     );
                                 }
-                            }
                         }
                         Information::SubChannelLong {
                             SubChId,
@@ -444,8 +443,8 @@ impl Ensemble {
         PacketAddr: u16,
         SCCA: u16,
     ) {
-        if let Some(service) = self.services.get_mut(&service_id) {
-            if let Some(data_subchannel) = service.data_subchannels.get_mut(&subchannel_id) {
+        if let Some(service) = self.services.get_mut(&service_id)
+            && let Some(data_subchannel) = service.data_subchannels.get_mut(&subchannel_id) {
                 data_subchannel.subchid = SubChId;
                 data_subchannel.scca_flag = SCCAFlag;
                 data_subchannel.dg = DG;
@@ -453,7 +452,6 @@ impl Ensemble {
                 data_subchannel.packet_addr = PacketAddr;
                 data_subchannel.scca = SCCA;
             }
-        }
     }
 
     pub fn find_service_for_subchannel(&self, SubChId: u8) -> Option<u32> {

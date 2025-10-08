@@ -86,8 +86,8 @@ fn fic(rx: &Receiver<Buffer>, service_name: &str) -> Ensemble {
         if buffer.last {
             break;
         }
-        if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
-            if let Some(fibs) = fic_decoder.try_buffer(fic_buffer) {
+        if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer)
+            && let Some(fibs) = fic_decoder.try_buffer(fic_buffer) {
                 for fib in fibs {
                     let figs = fic_decoder.extract_figs(&fib);
                     for fig in figs {
@@ -98,7 +98,6 @@ fn fic(rx: &Receiver<Buffer>, service_name: &str) -> Ensemble {
                     break;
                 }
             }
-        }
     }
     ens
 }

@@ -6,7 +6,7 @@ pub use viterbi::Viterbi;
 const K: i32 = 1536;
 
 pub fn bit_reverse(bits: &mut [bool]) {
-    assert!(bits.len() % 16 == 0);
+    assert!(bits.len().is_multiple_of(16));
     for chunk in bits.chunks_mut(16) {
         chunk.reverse();
     }

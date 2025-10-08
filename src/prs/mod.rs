@@ -53,11 +53,10 @@ impl PhaseReferenceSymbol {
         if self.is_complete() {
             return;
         }
-        if let Ok(prs_buffer) = TryInto::<PhaseReferenceBuffer>::try_into(buffer) {
-            if prs_buffer.block == self.next_block {
+        if let Ok(prs_buffer) = TryInto::<PhaseReferenceBuffer>::try_into(buffer)
+            && prs_buffer.block == self.next_block {
                 self.append_data(&prs_buffer);
             }
-        }
     }
 
     fn append_data(&mut self, buffer: &PhaseReferenceBuffer) {
