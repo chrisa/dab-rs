@@ -67,15 +67,15 @@ impl Wavefinder {
         let mut rc: u32;
 
         /* Load the RF R counter of the Band L PLL - constants */
-        rc = 0x100000 | reverse_bits(R_2331A, 15) << 5 | 0x10;
+        rc = 0x100000 | (reverse_bits(R_2331A, 15) << 5) | 0x10;
         self.tune_msg(rc, 22, LMX2331A, lband);
 
         /* Load the RF N counter of the Band L PLL - constants */
-        rc = 0x300000 | reverse_bits(NRFA_2331A, 7) << 13 | reverse_bits(NRFB_2331A, 11) << 2 | 2;
+        rc = 0x300000 | (reverse_bits(NRFA_2331A, 7) << 13) | (reverse_bits(NRFB_2331A, 11) << 2) | 2;
         self.tune_msg(rc, 22, LMX2331A, lband);
 
         /* Load the IF R counter of the Band L PLL - constants */
-        rc = reverse_bits(R_2331A, 15) << 5 | 0x10;
+        rc = (reverse_bits(R_2331A, 15) << 5) | 0x10;
         self.tune_msg(rc, 22, LMX2331A, lband);
 
         /* Load the N counter of the Band III PLL - this does the tuning */
@@ -83,18 +83,18 @@ impl Wavefinder {
         let f_vco = f_vcod.ceil() as u32; /* TODO: Necessary ?  Seems to be *essential* */
 
         /* Load the IF N counter of the Band L PLL - constants */
-        rc = 0x200000 | reverse_bits(NIFA_2331A, 7) << 13 | reverse_bits(NIFB_2331A, 11) << 2 | 2;
+        rc = 0x200000 | (reverse_bits(NIFA_2331A, 7) << 13) | (reverse_bits(NIFB_2331A, 11) << 2) | 2;
         self.tune_msg(rc, 22, LMX2331A, lband);
 
         let b_1511 = f_vco / P_1511;
         let a_1511 = f_vco % P_1511;
 
         /* Load the R counter and S latch of the Band III PLL - constants */
-        rc = 0x8000 | (reverse_bits(R_1511 as u32, 14)) << 1 | 1;
+        rc = 0x8000 | ((reverse_bits(R_1511 as u32, 14)) << 1) | 1;
         self.tune_msg(rc, 16, LMX1511, lband);
 
         /* Load the N counter (as A and B counters) of the Band III PLL */
-        rc = reverse_bits(a_1511, 7) << 11 | reverse_bits(b_1511, 11);
+        rc = (reverse_bits(a_1511, 7) << 11) | reverse_bits(b_1511, 11);
         self.tune_msg(rc, 19, LMX1511, lband);
     }
 }

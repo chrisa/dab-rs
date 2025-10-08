@@ -384,7 +384,7 @@ fn new_type1(bytes: &Vec<u8>) -> Type1Header {
     }
 }
 
-impl<'a> Type1Header<'a> {
+impl Type1Header<'_> {
     fn extn(&self) -> u8 {
         self.bits[0..3].load_be()
     }
