@@ -5,19 +5,19 @@ pub use viterbi::Viterbi;
 
 const K: i32 = 1536;
 
-pub fn bit_reverse(bits: &mut [bool]) {
+pub fn bit_reverse(bits: &mut [u8]) {
     assert!(bits.len().is_multiple_of(16));
     for chunk in bits.chunks_mut(16) {
         chunk.reverse();
     }
 }
 
-pub fn bytes_to_bits(bytes: &[u8]) -> Vec<bool> {
+pub fn bytes_to_bits(bytes: &[u8]) -> Vec<u8> {
     let mut bits = vec![];
 
     for byte in bytes {
         for j in 0..8 {
-            bits.push(((byte >> j) & 1) != 0);
+            bits.push(if (byte >> j) & 1 > 0 { 1 } else { 0 });
         }
     }
 
@@ -32,13 +32,16 @@ fn byte(b: bool) -> u8 {
     }
 }
 
-pub fn bits_to_bytes(bits: &[bool; 256]) -> [u8; 30] {
+pub fn bits_to_bytes(bits: &[u8; 256]) -> [u8; 30] {
     let mut i = 0;
     let mut j = 0;
     let mut result: [u8; 30] = [0; 30];
     loop {
-        result[j] = (byte(bits[i])<<7) + (byte(bits[i+1])<<6) + (byte(bits[i+2])<<5) + (byte(bits[i+3])<<4) +       //be
-        (byte(bits[i+4])<<3) + (byte(bits[i+5])<<2) + (byte(bits[i+6])<<1) + byte(bits[i+7]);
+        // result[j] = (byte(bits[i])<<7) + (byte(bits[i+1])<<6) + (byte(bits[i+2])<<5) + (byte(bits[i+3])<<4) +       //be
+        // (byte(bits[i+4])<<3) + (byte(bits[i+5])<<2) + (byte(bits[i+6])<<1) + byte(bits[i+7]);
+
+        result[j] = (bits[i]<<7) + (bits[i+1]<<6) + (bits[i+2]<<5) + (bits[i+3]<<4) +       //be
+        (bits[i+4]<<3) + (bits[i+5]<<2) + (bits[i+6]<<1) + bits[i+7];
 
         j += 1;
         i += 8;
@@ -50,9 +53,9 @@ pub fn bits_to_bytes(bits: &[bool; 256]) -> [u8; 30] {
     result
 }
 
-pub fn qpsk_symbol_demapper(bits: &[bool]) -> Vec<bool> {
+pub fn qpsk_symbol_demapper(bits: &[u8]) -> Vec<u8> {
     let mut slice = vec![];
-    slice.resize(bits.len(), false);
+    slice.resize(bits.len(), 0);
 
     for n in 0..K as usize {
         slice[n] = bits[2 * n];
@@ -62,21 +65,21 @@ pub fn qpsk_symbol_demapper(bits: &[bool]) -> Vec<bool> {
     slice
 }
 
-pub fn depuncture(bits: &[bool; 2304]) -> Vec<bool> {
+pub fn depuncture(bits: &[u8; 2304]) -> Vec<u8> {
     // 21 blocks, using puncture 1110 1110 1110 1110 1110 1110 1110 1110
     //  3 blocks, using puncture 1110 1110 1110 1110 1110 1110 1110 1100
     // 24 bits,   using puncture 1100 1100 1100 1100 1100 1100
     let mut i: usize = 0;
     let mut k: usize = 0;
-    let mut result = vec![];
-    result.resize(3096, false);
+    let mut result: Vec<u8> = vec![];
+    result.resize(3096, 0);
 
     loop {
         for j in 0..8 {
             result[i + j * 4] = bits[k];
             result[i + j * 4 + 1] = bits[k + 1];
             result[i + j * 4 + 2] = bits[k + 2];
-            result[i + j * 4 + 3] = false; // mark depunctured bit for soft decision
+            result[i + j * 4 + 3] = 0; // mark depunctured bit for soft decision
             k += 3;
         }
 
@@ -92,15 +95,15 @@ pub fn depuncture(bits: &[bool; 2304]) -> Vec<bool> {
             result[i + j * 4] = bits[k];
             result[i + j * 4 + 1] = bits[k + 1];
             result[i + j * 4 + 2] = bits[k + 2];
-            result[i + j * 4 + 3] = false;
+            result[i + j * 4 + 3] = 0;
             k += 3;
         }
 
         let j = 7; // value of j after the loop above (!)
         result[i + j * 4] = bits[k];
         result[i + j * 4 + 1] = bits[k + 1];
-        result[i + j * 4 + 2] = false;
-        result[i + j * 4 + 3] = false;
+        result[i + j * 4 + 2] = 0;
+        result[i + j * 4 + 3] = 0;
         k += 2;
 
         i += 32;
@@ -112,8 +115,8 @@ pub fn depuncture(bits: &[bool; 2304]) -> Vec<bool> {
     for j in 0..6 {
         result[i + j * 4] = bits[k];
         result[i + j * 4 + 1] = bits[k + 1];
-        result[i + j * 4 + 2] = false;
-        result[i + j * 4 + 3] = false;
+        result[i + j * 4 + 2] = 0;
+        result[i + j * 4 + 3] = 0;
         k += 2;
     }
 
@@ -171,7 +174,7 @@ pub fn depuncture(bits: &[bool; 2304]) -> Vec<bool> {
 //10 Energy dispersal
 //10.1 General procedure
 //10.2 Energy dispersal as applied in the Fast Information Channel
-pub fn scramble(bits: &[bool]) -> Vec<bool> {
+pub fn scramble(bits: &[u8]) -> Vec<u8> {
     let mut v: u16 = 0x1ff;
     let mut result = vec![];
 
@@ -180,7 +183,8 @@ pub fn scramble(bits: &[bool]) -> Vec<bool> {
         let v0 = ((v >> 9) & 1) ^ ((v >> 5) & 1);
         v |= v0;
 
-        result.push(bit ^ ((v0 & 1) != 0));
+        let res = ((bit & 1) != 0) ^ ((v0 & 1) != 0);
+        result.push(if res { 1 } else { 0 });
     }
 
     result
@@ -189,11 +193,11 @@ pub fn scramble(bits: &[bool]) -> Vec<bool> {
 const CRC_POLY: u32 = 0x8408;
 const CRC_GOOD: u32 = 0xf0b8;
 
-pub fn crc16(bits: &[bool; 256]) -> bool {
+pub fn crc16(bits: &[u8; 256]) -> bool {
     let mut crc = 0xffff;
 
     for bit in bits {
-        let c15 = (crc & 1) ^ (if *bit { 1u32 } else { 0u32 });
+        let c15 = (crc & 1) ^ (if (bit & 1) != 0 { 1u32 } else { 0u32 });
         crc >>= 1;
         if c15 == 1 {
             crc ^= CRC_POLY;
