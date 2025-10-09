@@ -25,10 +25,10 @@ pub struct PhaseReferenceSynchroniser {
     ravg: RAverage,
     selstr: [u8; 10],
     count: i32,
-    LOCKED: &'static AtomicBool,
+    locked: &'static AtomicBool,
 }
 
-pub fn new_synchroniser(LOCKED: &'static AtomicBool) -> PhaseReferenceSynchroniser {
+pub fn new_synchroniser(locked: &'static AtomicBool) -> PhaseReferenceSynchroniser {
     let (prs1, prs2) = prs_reference_1_2();
     PhaseReferenceSynchroniser {
         prs1,
@@ -40,7 +40,7 @@ pub fn new_synchroniser(LOCKED: &'static AtomicBool) -> PhaseReferenceSynchronis
         ravg: new_raverage(),
         selstr: [0xff; 10],
         count: 0,
-        LOCKED,
+        locked,
     }
 }
 
@@ -65,7 +65,7 @@ fn align_reference_symbol(indx: i32, source: &PhaseReferenceArray) -> [Complex64
 
 impl PhaseReferenceSynchroniser {
     fn locked(&self) -> bool {
-        self.LOCKED.load(Ordering::Relaxed)
+        self.locked.load(Ordering::Relaxed)
     }
 
     fn lock(&mut self) -> bool {
@@ -74,14 +74,14 @@ impl PhaseReferenceSynchroniser {
             false
         } else {
             self.lock_count = 0;
-            self.LOCKED.store(true, Ordering::Relaxed);
+            self.locked.store(true, Ordering::Relaxed);
             true
         }
     }
 
     fn unlock(&mut self) {
         self.lock_count = 3;
-        self.LOCKED.store(false, Ordering::Relaxed);
+        self.locked.store(false, Ordering::Relaxed);
     }
 
     pub fn try_sync_prs(&mut self, prs: PhaseReferenceSymbol) -> Vec<Message> {

@@ -6,23 +6,16 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::too_many_arguments)]
 
-mod decode;
-mod fic;
-mod msc;
-mod prs;
-mod source;
-mod wavefinder;
-
 use std::sync::mpsc::{self, Receiver};
 
 use clap::Parser;
-use fic::{
+use dab::fic::{
     ensemble::{new_ensemble, Ensemble, Service},
     FastInformationChannelBuffer,
 };
-use msc::cif::channel_symbols;
-use source::Source;
-use wavefinder::Buffer;
+use dab::msc::cif::channel_symbols;
+use dab::source::Source;
+use dab::wavefinder::Buffer;
 
 #[derive(Debug, Clone, clap::ValueEnum, PartialEq)]
 enum CliSource {
@@ -47,13 +40,13 @@ fn main() {
     if args.source == CliSource::Wavefinder {
         go(
             rx,
-            &source::wavefinder::new_wavefinder_source(tx, args.file),
+            &dab::source::wavefinder::new_wavefinder_source(tx, args.file),
             &args.service,
         );
     } else if args.source == CliSource::File {
         go(
             rx,
-            &source::file::new_file_source(tx, args.file),
+            &dab::source::file::new_file_source(tx, args.file),
             &args.service,
         );
     }
@@ -78,7 +71,7 @@ fn go(rx: Receiver<Buffer>, source: &impl Source, service_name: &str) {
 }
 
 fn fic(rx: &Receiver<Buffer>, service_name: &str) -> Ensemble {
-    let mut fic_decoder = fic::new_decoder();
+    let mut fic_decoder = dab::fic::new_decoder();
     let mut ens = new_ensemble();
     let service_name = service_name.to_owned();
 

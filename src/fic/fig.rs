@@ -1,3 +1,6 @@
+#![allow(non_snake_case)]
+#![allow(unused_variables)]
+
 use bitvec::{
     field::BitField,
     order::{Lsb0, Msb0},

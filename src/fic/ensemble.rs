@@ -1,3 +1,5 @@
+#![allow(non_snake_case)]
+
 use itertools::Itertools;
 use std::collections::HashMap;
 
@@ -96,7 +98,7 @@ pub fn new_data_subchannel(id: u16, primary: bool) -> DataSubChannel {
     }
 }
 
-static uep: [(u16, u16, u8); 64] = [
+static UEP: [(u16, u16, u8); 64] = [
     (32, 16, 5),
     (32, 21, 4),
     (32, 24, 3),
@@ -297,7 +299,7 @@ impl Ensemble {
                         } => {
                             if let Some(SId) = self.find_service_for_subchannel(SubChId)
                                 && TabIndx < 64 {
-                                    let (BitRate, SubChSz, ProtLvl) = uep[TabIndx as usize];
+                                    let (BitRate, SubChSz, ProtLvl) = UEP[TabIndx as usize];
                                     self.set_service_subchannel_info(
                                         SId,
                                         SubChId,
