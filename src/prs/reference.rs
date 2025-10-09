@@ -77,12 +77,12 @@ use std::str::FromStr;
 //     (prs_syms, prs_conj)
 // }
 
-const prs1_gplot: &str = include_str!("prs1.gplot");
-const prs2_gplot: &str = include_str!("prs2.gplot");
+const PRS1_GPLOT: &str = include_str!("prs1.gplot");
+const PRS2_GPLOT: &str = include_str!("prs2.gplot");
 
 pub fn prs_reference_1_2() -> (PhaseReferenceArray, PhaseReferenceArray) {
-    let prs1 = parse_gplot_file(prs1_gplot);
-    let prs2 = parse_gplot_file(prs2_gplot);
+    let prs1 = parse_gplot_file(PRS1_GPLOT);
+    let prs2 = parse_gplot_file(PRS2_GPLOT);
     (prs1.try_into().unwrap(), prs2.try_into().unwrap())
 }
 

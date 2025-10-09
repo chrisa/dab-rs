@@ -54,8 +54,7 @@ pub fn bits_to_bytes(bits: &[u8; 256]) -> [u8; 30] {
 }
 
 pub fn qpsk_symbol_demapper(bits: &[u8]) -> Vec<u8> {
-    let mut slice = vec![];
-    slice.resize(bits.len(), 0);
+    let mut slice = vec![0; bits.len()];
 
     for n in 0..K as usize {
         slice[n] = bits[2 * n];
@@ -71,8 +70,7 @@ pub fn depuncture(bits: &[u8; 2304]) -> Vec<u8> {
     // 24 bits,   using puncture 1100 1100 1100 1100 1100 1100
     let mut i: usize = 0;
     let mut k: usize = 0;
-    let mut result: Vec<u8> = vec![];
-    result.resize(3096, 0);
+    let mut result: Vec<u8> = vec![0; 3096];
 
     loop {
         for j in 0..8 {

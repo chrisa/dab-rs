@@ -234,7 +234,7 @@ impl PhaseReferenceSynchroniser {
     }
 
     fn sync_imsg(&mut self, ir: f64) -> Message {
-        const chgstr: [u8; 10] = [0x00, 0xf0, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11];
+        const CHGSTR: [u8; 10] = [0x00, 0xf0, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11];
 
         let w1: i16 = (ir * 81.66400146484375) as i32 as i16;
         let w2: i16 = (ir * 1.024) as i32 as i16;
@@ -242,7 +242,7 @@ impl PhaseReferenceSynchroniser {
         let mut symstr: [u8; 10] = [0; 10];
 
         if self.count > 0 {
-            symstr.copy_from_slice(&chgstr);
+            symstr.copy_from_slice(&CHGSTR);
             self.count -= 1;
         } else {
             symstr.copy_from_slice(&self.selstr);

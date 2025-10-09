@@ -198,7 +198,7 @@ impl Viterbi {
                 for j in 0..N {
                     let bindex = symbol_offset + j;
                     let bit = bits[bindex] != 0;
-                    let bit_idx = ((i >> (N - j - 1)) & 1) as usize;
+                    let bit_idx = ((i >> (N - j - 1)) & 1);
                     acc += metrics[bit_idx][if bit { 1 } else { 0 }];
                 }
                 mets[i] = acc;
