@@ -39,7 +39,7 @@ pub fn channel_symbols(service: &Service) -> ChannelSymbols {
     let count = symbol_0.length() + 1;
 
     let symbols: Vec<SymbolRange> = (0..4)
-        .scan(symbol_0, |state, i| {
+        .scan(symbol_0, |state, _i| {
             let this = SymbolRange {
                 start: state.start,
                 end: state.end,

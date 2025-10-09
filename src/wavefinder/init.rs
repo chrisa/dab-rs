@@ -137,28 +137,28 @@ impl Wavefinder {
     }
 
     fn boot_dsps(&self) {
-        let dspA = include_bytes!("rsDSPa.bin");
-        let dspB = include_bytes!("rsDSPb.bin");
+        let dsp_a = include_bytes!("rsDSPa.bin");
+        let dsp_b = include_bytes!("rsDSPb.bin");
 
         self.sendmem(0, 0, &as_u8(vec![Self::HPIA_B, 0x00e0, 0x0000]));
         self.sendmem(0, 0, &as_u8(vec![Self::HPID_B, 0x0000, 0x0000]));
         self.sendmem(0, 0, &as_u8(vec![Self::HPIC_B, 0x0001, 0x0001]));
         self.sendmem(0, 0, &as_u8(vec![Self::HPIC_A, 0x0001, 0x0001]));
 
-        self.load_firmware(dspB, Self::HPIA_B, Self::HPID_B);
-        self.load_firmware(dspA, Self::HPIA_A, Self::HPID_A);
+        self.load_firmware(dsp_b, Self::HPIA_B, Self::HPID_B);
+        self.load_firmware(dsp_a, Self::HPIA_A, Self::HPID_A);
 
         self.sendmem(0, 0, &as_u8(vec![Self::HPIA_A, 0x007e, 0x0000]));
         self.sendmem(0, 0, &as_u8(vec![Self::HPIA_B, 0x007e, 0x0000]));
         self.sendmem(
             0,
             0,
-            &as_u8(vec![Self::HPID_A, dspA[0].into(), dspA[1].into()]),
+            &as_u8(vec![Self::HPID_A, dsp_a[0].into(), dsp_a[1].into()]),
         );
         self.sendmem(
             0,
             0,
-            &as_u8(vec![Self::HPID_B, dspB[0].into(), dspB[1].into()]),
+            &as_u8(vec![Self::HPID_B, dsp_b[0].into(), dsp_b[1].into()]),
         );
 
         self.sendmem(0, 0, &as_u8(vec![Self::HPIA_B, 0x00ff, 0x003e]));

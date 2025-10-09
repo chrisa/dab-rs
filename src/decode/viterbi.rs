@@ -4,7 +4,6 @@
 use libm::erf;
 use std::f64::consts::SQRT_2;
 
-const OFFSET: f64 = 128.0;
 const K: usize = 7;
 const N: usize = 4;
 
@@ -198,7 +197,7 @@ impl Viterbi {
                 for j in 0..N {
                     let bindex = symbol_offset + j;
                     let bit = bits[bindex] != 0;
-                    let bit_idx = ((i >> (N - j - 1)) & 1);
+                    let bit_idx = (i >> (N - j - 1)) & 1;
                     acc += metrics[bit_idx][if bit { 1 } else { 0 }];
                 }
                 mets[i] = acc;

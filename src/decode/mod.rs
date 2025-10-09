@@ -24,22 +24,11 @@ pub fn bytes_to_bits(bytes: &[u8]) -> Vec<u8> {
     bits
 }
 
-fn byte(b: bool) -> u8 {
-    if b {
-        1
-    } else {
-        0
-    }
-}
-
 pub fn bits_to_bytes(bits: &[u8; 256]) -> [u8; 30] {
     let mut i = 0;
     let mut j = 0;
     let mut result: [u8; 30] = [0; 30];
     loop {
-        // result[j] = (byte(bits[i])<<7) + (byte(bits[i+1])<<6) + (byte(bits[i+2])<<5) + (byte(bits[i+3])<<4) +       //be
-        // (byte(bits[i+4])<<3) + (byte(bits[i+5])<<2) + (byte(bits[i+6])<<1) + byte(bits[i+7]);
-
         result[j] = (bits[i]<<7) + (bits[i+1]<<6) + (bits[i+2]<<5) + (bits[i+3]<<4) +       //be
         (bits[i+4]<<3) + (bits[i+5]<<2) + (bits[i+6]<<1) + bits[i+7];
 

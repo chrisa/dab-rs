@@ -392,11 +392,11 @@ impl Type1Header<'_> {
         self.bits[0..3].load_be()
     }
 
-    fn oe(&self) -> u8 {
+    fn _oe(&self) -> u8 {
         self.bits[3..4].load_be()
     }
 
-    fn charset(&self) -> u8 {
+    fn _charset(&self) -> u8 {
         self.bits[4..8].load_be()
     }
 
