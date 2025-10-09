@@ -51,7 +51,7 @@ impl Source for FileSource {
         })
     }
 
-    fn select_service(&mut self, service: &Service) {
+    fn select_service(&mut self, _service: &Service) {
         // no-op for file source
     }
 }
