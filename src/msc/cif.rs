@@ -1,19 +1,45 @@
-use std::ops::Range;
-
 use crate::{fic::ensemble::Service, wavefinder::Buffer};
 use bitvec::prelude::*;
+use std::fmt;
+use std::ops::Range;
+
+#[derive(Debug)]
+enum SizedBuffer {
+    One(Box<Buffers<1>>),
+    Two(Box<Buffers<2>>),
+    Three(Box<Buffers<3>>),
+}
 
 #[derive(Debug)]
 pub struct MainServiceChannel<'a> {
     service: &'a Service,
     symbols: ChannelSymbols,
-    buffers: Box<Buffers>,
-}
-
-#[derive(Debug)]
-pub struct Buffers {
     cur_frame: u8,
     cifcnt: u64,
+    buffers: SizedBuffer,
+}
+
+// all symbols for one frame
+pub struct Buffers<const N: usize> {
+    symbols: [[MainServiceChannelBuffer; N]; 4],
+}
+
+impl<const N: usize> fmt::Debug for Buffers<{ N }> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Buffers<{}>", N)
+    }
+}
+
+// one symbol, deinterleaved
+#[derive(Debug, Clone, Copy)]
+pub struct MainServiceChannelBuffer {
+    bytes: [u8; 3072],
+}
+
+impl Default for MainServiceChannelBuffer {
+    fn default() -> Self {
+        Self { bytes: [0; 3072] }
+    }
 }
 
 #[derive(Debug)]
@@ -37,21 +63,29 @@ pub struct ChannelSymbols {
     ranges: [SymbolRange; 4],
     startcu: u16,
     endcu: u16,
-    count: u16,
+    pub count: u16,
 }
-
-#[derive(Debug)]
-pub struct MainServiceChannelBuffer {}
 
 pub fn new_channel(service: &Service) -> MainServiceChannel<'_> {
     let symbols = channel_symbols(service);
+    let buffers = match symbols.count {
+        1 => SizedBuffer::One(Box::new(Buffers::<1> {
+            symbols: [[MainServiceChannelBuffer::default(); 1]; 4],
+        })),
+        2 => SizedBuffer::Two(Box::new(Buffers::<2> {
+            symbols: [[MainServiceChannelBuffer::default(); 2]; 4],
+        })),
+        3 => SizedBuffer::Three(Box::new(Buffers::<3> {
+            symbols: [[MainServiceChannelBuffer::default(); 3]; 4],
+        })),
+        _ => panic!("unexpected count"),
+    };
     MainServiceChannel {
         service,
         symbols,
-        buffers: Box::new(Buffers {
-            cur_frame: 0,
-            cifcnt: 0,
-        }),
+        cur_frame: 0,
+        cifcnt: 0,
+        buffers,
     }
 }
 
@@ -60,10 +94,10 @@ impl<'a> MainServiceChannel<'a> {
         let symbol = buffer.bytes[2];
         let frame: u8 = buffer.bytes[3];
 
-        // println!("symbol: {}", symbol);
+        // println!("symbol: {} frame: {}", symbol, frame);
 
         if symbol == self.symbols.ranges[0].start {
-            self.buffers.as_mut().cur_frame = frame;
+            self.cur_frame = frame;
         }
     }
 
@@ -96,7 +130,7 @@ const MSCSTART: u16 = 5;
 const CUSPERSYM: u16 = 48;
 const SYMSPERCIF: u8 = 18;
 
-fn channel_symbols(service: &Service) -> ChannelSymbols {
+pub fn channel_symbols(service: &Service) -> ChannelSymbols {
     let subchannel = service.subchannel();
 
     let size = subchannel.size();

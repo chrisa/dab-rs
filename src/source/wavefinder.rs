@@ -20,13 +20,19 @@ static LOCKED: AtomicBool = AtomicBool::new(false);
 pub struct WavefinderSource {
     tx: Sender<Buffer>,
     path: Option<PathBuf>,
+    freq: String,
     sync: Option<Arc<Mutex<PhaseReferenceSynchroniser>>>,
 }
 
-pub fn new_wavefinder_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> Box<dyn Source> {
+pub fn new_wavefinder_source(
+    tx: Sender<Buffer>,
+    path: Option<PathBuf>,
+    freq: Option<String>,
+) -> Box<dyn Source> {
     Box::new(WavefinderSource {
         tx,
         path,
+        freq: freq.unwrap_or("225.648".to_owned()),
         sync: None,
     })
 }
@@ -46,6 +52,7 @@ impl Source for WavefinderSource {
         let file_output = self.path.is_some();
         let path = self.path.clone();
         let tx = self.tx.clone();
+        let freq = self.freq.clone();
 
         let sync = Arc::new(Mutex::new(new_synchroniser(&LOCKED)));
         self.sync = Some(sync.clone());
@@ -108,13 +115,12 @@ impl Source for WavefinderSource {
 
             w.set_callback(cb);
 
-            w.init(225.648); // BBC National DAB
+            if let Ok(f) = freq.parse::<f64>() {
+                w.init(f); // BBC National DAB
+            } else {
+                panic!("bad frequency: {}", freq);
+            }
 
-            // w.init(218.640); // Ayr
-
-            // w.init(223.936); // D1 National (Scotland)
-            // w.init(216.928); // Should be National 2
-            // w.init(222.064); // Should be Central Scotland
             w.read();
 
             loop {

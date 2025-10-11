@@ -26,6 +26,7 @@ enum CliSource {
 }
 
 #[derive(Parser, Debug)]
+#[command(about, version)]
 struct Cli {
     #[clap(value_enum, default_value_t=CliSource::Wavefinder)]
     source: CliSource,
@@ -33,6 +34,8 @@ struct Cli {
     service: String,
     #[arg(short, long)]
     file: Option<std::path::PathBuf>,
+    #[arg(long)]
+    frequency: Option<String>,
 }
 
 struct DABReceiver<'a> {
@@ -47,7 +50,11 @@ fn main() {
 
     let mut dab = match args.source {
         CliSource::Wavefinder => DABReceiver {
-            source: &mut dab::source::wavefinder::new_wavefinder_source(tx, args.file),
+            source: &mut dab::source::wavefinder::new_wavefinder_source(
+                tx,
+                args.file,
+                args.frequency,
+            ),
             rx,
             service_id: args.service,
         },

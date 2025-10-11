@@ -2,6 +2,7 @@
 name = "dab"
 version = "0.1.0"
 edition = "2024"
+description = "DAB\n225.648 BBC National DAB\n218.640 Ayr\n223.936 D1 National (Scotland)\n216.928 National 2\n222.064 Central Scotland\n"
 
 [build-dependencies]
 bindgen = "0.71.1"

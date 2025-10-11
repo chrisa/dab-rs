@@ -4,6 +4,8 @@ use itertools::Itertools;
 use std::sync::atomic::Ordering::Relaxed;
 use std::{collections::HashMap, sync::atomic::AtomicU64};
 
+use crate::msc::cif::channel_symbols;
+
 use super::fig::{Fig, FigType, Information, LabelPurpose, ServiceComponent};
 
 pub struct Ensemble {
@@ -253,9 +255,10 @@ impl Ensemble {
             .sorted_by(|a, b| Ord::cmp(&a.id, &b.id))
         {
             for subchannel in service.audio_subchannels.values() {
+                let cs = channel_symbols(service);
                 let PS = if subchannel.primary { "Pri" } else { "Sec " };
                 println!(
-                    "{:16} (0x{:04x}) {} subch={} start={} size={} bitrate={} {:?}",
+                    "{:16} (0x{:04x}) {} subch={} start={} size={} bitrate={} count={} {:?}",
                     service.name,
                     service.id,
                     PS,
@@ -263,6 +266,7 @@ impl Ensemble {
                     subchannel.start,
                     subchannel.size,
                     subchannel.bitrate,
+                    cs.count,
                     subchannel.prot
                 );
             }
