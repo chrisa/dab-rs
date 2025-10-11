@@ -38,7 +38,7 @@ struct Cli {
 struct DABReceiver<'a> {
     rx: Receiver<Buffer>,
     source: &'a mut Box<dyn Source>,
-    service_name: String,
+    service_id: String,
 }
 
 fn main() {
@@ -49,12 +49,12 @@ fn main() {
         CliSource::Wavefinder => DABReceiver {
             source: &mut dab::source::wavefinder::new_wavefinder_source(tx, args.file),
             rx,
-            service_name: args.service,
+            service_id: args.service,
         },
         CliSource::File => DABReceiver {
             source: &mut dab::source::file::new_file_source(tx, args.file),
             rx,
-            service_name: args.service,
+            service_id: args.service,
         },
     };
 
@@ -70,21 +70,21 @@ impl<'a> DABReceiver<'a> {
         ens.display();
 
         // If service, MSC
-        if let Some(service) = ens.find_service(&self.service_name) {
-            println!("Service '{}' found, playing", &self.service_name);
+        if let Some(service) = ens.find_service_by_id(&self.service_id) {
+            println!("Service ID '{:04x}' found, {}", service.id, service.name);
             let mut msc = new_channel(service);
             self.source.as_mut().select_channel(&msc);
             self.msc(&mut msc);
             t.join().unwrap();
         } else {
-            println!("Service '{}' not found in ensemble", &self.service_name);
+            println!("Service '{}' not found in ensemble", &self.service_id);
         }
     }
 
     fn fic(&self) -> Ensemble {
         let mut fic_decoder = dab::fic::new_decoder();
         let mut ens = new_ensemble();
-        let service_name = self.service_name.to_owned();
+        let service_name = self.service_id.to_owned();
 
         while let Ok(buffer) = self.rx.recv() {
             if buffer.last {
@@ -114,7 +114,7 @@ impl<'a> DABReceiver<'a> {
             }
 
             channel.try_buffer(&buffer);
-            dbg!(&channel);
+            // dbg!(&channel);
         }
     }
 }

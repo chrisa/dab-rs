@@ -5,8 +5,7 @@ use std::convert::TryFrom;
 mod fft;
 mod maths;
 mod reference;
-mod sync;
-pub use sync::new_synchroniser;
+pub mod sync;
 
 pub const PRS_POINTS: usize = 2048;
 pub type PhaseReferenceArray = [Complex64; PRS_POINTS];

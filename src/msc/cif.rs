@@ -1,4 +1,7 @@
+use std::ops::Range;
+
 use crate::{fic::ensemble::Service, wavefinder::Buffer};
+use bitvec::prelude::*;
 
 #[derive(Debug)]
 pub struct MainServiceChannel<'a> {
@@ -23,11 +26,15 @@ impl SymbolRange {
     pub fn length(&self) -> u8 {
         self.end - self.start
     }
+
+    pub fn symbols(&self) -> Range<u8> {
+        self.start..self.end + 1
+    }
 }
 
 #[derive(Debug)]
 pub struct ChannelSymbols {
-    symbols: [SymbolRange; 4],
+    ranges: [SymbolRange; 4],
     startcu: u16,
     endcu: u16,
     count: u16,
@@ -53,11 +60,32 @@ impl<'a> MainServiceChannel<'a> {
         let symbol = buffer.bytes[2];
         let frame: u8 = buffer.bytes[3];
 
-        if symbol == self.symbols.symbols[0].start {
+        if symbol == self.symbols.ranges[0].start {
             self.buffers.as_mut().cur_frame = frame;
-            
-
+            // ...
         }
+    }
+
+    pub fn selstr(&self) -> [u8; 10] {
+        let mut str: [u8; 10] = [0; 10];
+        let bits = str.view_bits_mut::<Msb0>();
+
+        for sr in &self.symbols.ranges {
+            for sym in sr.symbols() {
+                // avoid FIC symbols here
+                if sym > 4 {
+                    bits.set(sym as usize - 1, true);
+                    bits.set(sym as usize - 2, true);
+                }
+            }
+        }
+
+        // always ask for FIC
+        for bit in 0..4 {
+            bits.set(bit, false);
+        }
+
+        str
     }
 }
 
@@ -65,7 +93,7 @@ const MSCSTART: u16 = 5;
 const CUSPERSYM: u16 = 48;
 const SYMSPERCIF: u8 = 18;
 
-pub fn channel_symbols(service: &Service) -> ChannelSymbols {
+fn channel_symbols(service: &Service) -> ChannelSymbols {
     let subchannel = service.subchannel();
 
     let size = subchannel.size();
@@ -92,7 +120,7 @@ pub fn channel_symbols(service: &Service) -> ChannelSymbols {
         .collect();
 
     ChannelSymbols {
-        symbols: symbols.try_into().unwrap(),
+        ranges: symbols.try_into().unwrap(),
         startcu,
         endcu,
         count,

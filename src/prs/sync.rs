@@ -1,6 +1,7 @@
 use rustfft::num_complex::Complex64;
 use rustfft::num_complex::c64;
 
+use crate::msc::cif::MainServiceChannel;
 use crate::prs::PRS_POINTS;
 use crate::prs::PhaseReferenceArray;
 use crate::prs::PhaseReferenceSymbol;
@@ -64,6 +65,12 @@ fn align_reference_symbol(indx: i32, source: &PhaseReferenceArray) -> [Complex64
 }
 
 impl PhaseReferenceSynchroniser {
+
+    pub fn select_channel(&mut self, channel: &MainServiceChannel) {
+        self.count = 6;
+        self.selstr = channel.selstr();
+    }
+
     fn locked(&self) -> bool {
         self.locked.load(Ordering::Relaxed)
     }

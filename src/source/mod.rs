@@ -6,6 +6,6 @@ pub mod file;
 pub mod wavefinder;
 
 pub trait Source {
-    fn run(&self) -> JoinHandle<()>;
+    fn run(&mut self) -> JoinHandle<()>;
     fn select_channel(&mut self, channel: &MainServiceChannel);
 }

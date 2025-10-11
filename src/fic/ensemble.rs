@@ -1,7 +1,8 @@
 #![allow(non_snake_case)]
 
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::atomic::AtomicU64};
+use std::sync::atomic::Ordering::Relaxed;
 
 use super::fig::{Fig, FigType, Information, LabelPurpose, ServiceComponent};
 
@@ -9,12 +10,13 @@ pub struct Ensemble {
     id: u16,
     name: String,
     services: HashMap<u32, Service>,
+    label_tries: AtomicU64,
 }
 
 #[derive(Debug)]
 pub struct Service {
-    id: u32,
-    name: String,
+    pub id: u32,
+    pub name: String,
     audio_subchannels: HashMap<u8, AudioSubChannel>,
     data_subchannels: HashMap<u16, DataSubChannel>,
 }
@@ -59,6 +61,7 @@ pub fn new_ensemble() -> Ensemble {
         id: 0,
         name: "Unknown".to_owned(),
         services: HashMap::new(),
+        label_tries: AtomicU64::new(0),
     }
 }
 
@@ -168,22 +171,41 @@ static UEP: [(u16, u16, u8); 64] = [
     (384, 416, 1),
 ];
 
-fn service_name_matches(a: &str, b: &str) -> bool {
-    a.trim_end() == b
-}
+// fn service_name_matches(a: &str, b: &str) -> bool {
+//     a.trim_end() == b
+// }
 
 impl Ensemble {
     pub fn is_complete(&self) -> bool {
-        !self.services.is_empty()
-            && self.services_labelled()
-            && self.subchannels_contiguous()
-            && self.ensemble_labelled()
+        let tries = self.increment_tries();
+        let empty = self.services.is_empty();
+        let service_labels = self.services_labelled();
+        let contiguous = self.subchannels_contiguous();
+        let ensemble_label = self.ensemble_labelled();
+        println!("tries: {} empty: {} service_labels: {} contiguous: {} ensemble_label: {}", tries, empty, service_labels, contiguous, ensemble_label);
+        tries > 100 || (!empty && service_labels && ensemble_label)
     }
 
-    pub fn find_service(&self, name: &str) -> Option<&Service> {
-        self.services
-            .values()
-            .find(|s| service_name_matches(&s.name, name))
+    pub fn find_service_by_id(&self, id_str: &str) -> Option<&Service> {
+        if let Ok(id) = u32::from_str_radix(id_str, 16) {
+            self.services
+                .values()
+                .find(|s| s.id == id)
+        }
+        else {
+            None
+        }
+    }
+
+    fn increment_tries(&self) -> u64 {
+        let mut current = self.label_tries.load(Relaxed);
+        loop {
+            let new = current + 1;
+            match self.label_tries.compare_exchange(current, new, Relaxed, Relaxed) {
+                Ok(_) => return current,
+                Err(v) => current = v,
+            }
+        }
     }
 
     fn services_labelled(&self) -> bool {

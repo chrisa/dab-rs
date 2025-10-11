@@ -20,7 +20,7 @@ pub fn new_file_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> Box<dyn Sou
 }
 
 impl Source for FileSource {
-    fn run(&self) -> JoinHandle<()> {
+    fn run(&mut self) -> JoinHandle<()> {
         let path = self.path.clone();
         let tx = self.tx.clone();
         thread::spawn(move || {
