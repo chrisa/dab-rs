@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 
 use itertools::Itertools;
-use std::{collections::HashMap, sync::atomic::AtomicU64};
 use std::sync::atomic::Ordering::Relaxed;
+use std::{collections::HashMap, sync::atomic::AtomicU64};
 
 use super::fig::{Fig, FigType, Information, LabelPurpose, ServiceComponent};
 
@@ -180,19 +180,15 @@ impl Ensemble {
         let tries = self.increment_tries();
         let empty = self.services.is_empty();
         let service_labels = self.services_labelled();
-        let contiguous = self.subchannels_contiguous();
+        // let contiguous = self.subchannels_contiguous();
         let ensemble_label = self.ensemble_labelled();
-        println!("tries: {} empty: {} service_labels: {} contiguous: {} ensemble_label: {}", tries, empty, service_labels, contiguous, ensemble_label);
         tries > 100 || (!empty && service_labels && ensemble_label)
     }
 
     pub fn find_service_by_id(&self, id_str: &str) -> Option<&Service> {
         if let Ok(id) = u32::from_str_radix(id_str, 16) {
-            self.services
-                .values()
-                .find(|s| s.id == id)
-        }
-        else {
+            self.services.values().find(|s| s.id == id)
+        } else {
             None
         }
     }
@@ -201,7 +197,10 @@ impl Ensemble {
         let mut current = self.label_tries.load(Relaxed);
         loop {
             let new = current + 1;
-            match self.label_tries.compare_exchange(current, new, Relaxed, Relaxed) {
+            match self
+                .label_tries
+                .compare_exchange(current, new, Relaxed, Relaxed)
+            {
                 Ok(_) => return current,
                 Err(v) => current = v,
             }

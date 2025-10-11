@@ -65,7 +65,6 @@ fn align_reference_symbol(indx: i32, source: &PhaseReferenceArray) -> [Complex64
 }
 
 impl PhaseReferenceSynchroniser {
-
     pub fn select_channel(&mut self, channel: &MainServiceChannel) {
         self.count = 6;
         self.selstr = channel.selstr();

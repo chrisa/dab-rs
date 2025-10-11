@@ -60,15 +60,16 @@ impl<'a> MainServiceChannel<'a> {
         let symbol = buffer.bytes[2];
         let frame: u8 = buffer.bytes[3];
 
+        // println!("symbol: {}", symbol);
+
         if symbol == self.symbols.ranges[0].start {
             self.buffers.as_mut().cur_frame = frame;
-            // ...
         }
     }
 
     pub fn selstr(&self) -> [u8; 10] {
-        let mut str: [u8; 10] = [0; 10];
-        let bits = str.view_bits_mut::<Msb0>();
+        let mut words: [u16; 5] = [0; 5];
+        let bits = words.view_bits_mut::<Msb0>();
 
         for sr in &self.symbols.ranges {
             for sym in sr.symbols() {
@@ -81,11 +82,13 @@ impl<'a> MainServiceChannel<'a> {
         }
 
         // always ask for FIC
-        for bit in 0..4 {
-            bits.set(bit, false);
+        for bit in 0..3 {
+            bits.set(bit, true);
         }
 
-        str
+        // Safety: transmuting to a type with less strict alignment, u16 -> u8
+
+        unsafe { std::mem::transmute::<[u16; 5], [u8; 10]>(words) }
     }
 }
 

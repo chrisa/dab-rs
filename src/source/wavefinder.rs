@@ -8,10 +8,10 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
 use crate::msc::cif::MainServiceChannel;
-use crate::wavefinder::{Buffer, Wavefinder};
 use crate::prs;
-use crate::prs::sync::{new_synchroniser, PhaseReferenceSynchroniser};
+use crate::prs::sync::{PhaseReferenceSynchroniser, new_synchroniser};
 use crate::wavefinder;
+use crate::wavefinder::{Buffer, Wavefinder};
 
 use super::Source;
 
@@ -24,18 +24,21 @@ pub struct WavefinderSource {
 }
 
 pub fn new_wavefinder_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> Box<dyn Source> {
-    Box::new(WavefinderSource { tx, path, sync: None })
+    Box::new(WavefinderSource {
+        tx,
+        path,
+        sync: None,
+    })
 }
 
 impl Source for WavefinderSource {
-
     fn select_channel(&mut self, channel: &MainServiceChannel) {
         dbg!(channel);
 
-        if let Some(sync) = &self.sync {
-            if let Ok(mut s) = sync.lock() {
-                s.select_channel(channel);
-            }
+        if let Some(sync) = &self.sync
+            && let Ok(mut s) = sync.lock()
+        {
+            s.select_channel(channel);
         }
     }
 
@@ -55,16 +58,15 @@ impl Source for WavefinderSource {
             let (prs_tx, prs_rx) = mpsc::channel();
             let (file_tx, file_rx) = mpsc::channel::<Buffer>();
 
-
             thread::spawn(move || {
                 loop {
                     let result = prs_rx.recv();
-                    if let Ok(complete_prs) = result {
-                        if let Ok(mut s) = sync.lock() {
-                            let messages = s.try_sync_prs(complete_prs);
-                            for m in messages {
-                                message_tx.send(m).unwrap(); // handle Err?
-                            }
+                    if let Ok(complete_prs) = result
+                        && let Ok(mut s) = sync.lock()
+                    {
+                        let messages = s.try_sync_prs(complete_prs);
+                        for m in messages {
+                            message_tx.send(m).unwrap(); // handle Err?
                         }
                     }
                 }
