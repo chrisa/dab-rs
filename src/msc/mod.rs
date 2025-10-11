@@ -9,7 +9,8 @@ mod cif;
 #[enum_dispatch]
 trait BufferOps {
     fn reset(&mut self);
-    fn push_buffer(&mut self, buffer: &Buffer, i: usize, j: usize);
+    fn push_buffer(&mut self, buffer: &MainServiceChannelBuffer, i: usize, j: usize);
+    fn frame_complete(&self) -> bool;
 }
 
 #[derive(Debug)]
@@ -31,25 +32,43 @@ pub struct MainServiceChannel<'a> {
 
 // all symbols for one frame
 pub struct Buffers<const N: usize> {
-    symbols: [[MainServiceChannelBuffer; N]; 4],
+    symbols: [[Option<MainServiceChannelBuffer>; N]; 4],
 }
 
 impl<const N: usize> fmt::Debug for Buffers<{ N }> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Buffers<{}>", N)
+        let mut s = String::new();
+        s.push_str(&format!("Buffers<{} ", N));
+        for sym in self.symbols {
+            for buf in sym {
+                s.push_str(if buf.is_none() { " " } else { "X" });
+            }
+        }
+        s.push_str(">");
+        write!(f, "{}", s)
     }
 }
 
 impl<const N: usize> BufferOps for Buffers<{N}> {
 
     fn reset(&mut self) {
-
+        self.symbols = [[None; N]; 4];
     }
 
-    fn push_buffer(&mut self, buffer: &Buffer, i: usize, j: usize) {
-
+    fn push_buffer(&mut self, buffer: &MainServiceChannelBuffer, i: usize, j: usize) {
+        self.symbols[i][j] = Some(*buffer);
     }
 
+    fn frame_complete(&self) -> bool {
+        for sym in self.symbols {
+            for buf in sym {
+                if buf.is_none() {
+                    return false;
+                }
+            }
+        }
+        true
+    }
 }
 
 // one symbol, deinterleaved
@@ -92,13 +111,13 @@ pub fn new_channel(service: &Service) -> MainServiceChannel<'_> {
     let symbols = cif::channel_symbols(service);
     let buffers = match symbols.count {
         1 => SizedBuffer::One(Buffers::<1> {
-            symbols: [[MainServiceChannelBuffer::default(); 1]; 4],
+            symbols: [[None; 1]; 4],
         }),
         2 => SizedBuffer::Two(Buffers::<2> {
-            symbols: [[MainServiceChannelBuffer::default(); 2]; 4],
+            symbols: [[None; 2]; 4],
         }),
         3 => SizedBuffer::Three(Buffers::<3> {
-            symbols: [[MainServiceChannelBuffer::default(); 3]; 4],
+            symbols: [[None; 3]; 4],
         }),
         _ => panic!("unexpected count"),
     };
@@ -111,18 +130,43 @@ pub fn new_channel(service: &Service) -> MainServiceChannel<'_> {
     }
 }
 
+pub struct MainBlock {
+
+}
+
 impl<'a> MainServiceChannel<'a> {
-    pub fn try_buffer(&mut self, buffer: &Buffer) {
-        let symbol = buffer.bytes[2];
+    pub fn try_buffer(&mut self, buffer: &Buffer) -> Option<MainBlock> {
+        let frame_symbol = buffer.bytes[2];
         let frame: u8 = buffer.bytes[3];
 
-        // println!("symbol: {} frame: {}", symbol, frame);
-
-        if symbol == self.symbols.ranges[0].start {
+        if frame_symbol == self.symbols.ranges[0].start {
             self.cur_frame = frame;
             self.buffers.reset();
-            self.buffers.push_buffer(buffer, 0, 0);
+            self.buffers.push_buffer(&self.deinterleave(buffer), 0, 0);
         }
+
+        for (i, range) in self.symbols.ranges.iter().enumerate() {
+            for (j, symbol) in range.symbols().enumerate() {
+                if frame_symbol == symbol && frame == self.cur_frame {
+                    self.buffers.push_buffer(&self.deinterleave(buffer), i, j);
+                }
+            }
+        }
+
+        if self.buffers.frame_complete() {
+            Some(self.decode())
+        }
+        else {
+            None
+        }
+    }
+
+    fn decode(&self) -> MainBlock {
+        MainBlock {  } // run viterbi -> return data for PAD / MPEG
+    }
+
+    fn deinterleave(&self, _buffer: &Buffer) -> MainServiceChannelBuffer {
+        MainServiceChannelBuffer::default() // run deinterleave
     }
 
     pub fn selstr(&self) -> [u8; 10] {
@@ -145,7 +189,6 @@ impl<'a> MainServiceChannel<'a> {
         }
 
         // Safety: transmuting to a type with less strict alignment, u16 -> u8
-
         unsafe { std::mem::transmute::<[u16; 5], [u8; 10]>(words) }
     }
 }
