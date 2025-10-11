@@ -6,7 +6,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::{fic::ensemble::Service, wavefinder::Buffer};
+use crate::{msc::cif::MainServiceChannel, wavefinder::Buffer};
 
 use super::Source;
 
@@ -51,7 +51,8 @@ impl Source for FileSource {
         })
     }
 
-    fn select_service(&mut self, _service: &Service) {
+    fn select_channel(&mut self, channel: &MainServiceChannel) {
+        dbg!(channel);
         // no-op for file source
     }
 }

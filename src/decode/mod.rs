@@ -1,7 +1,7 @@
 mod viterbi;
 
-pub use viterbi::new_viterbi;
 pub use viterbi::Viterbi;
+pub use viterbi::new_viterbi;
 
 const K: i32 = 1536;
 

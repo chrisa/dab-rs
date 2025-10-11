@@ -4,15 +4,15 @@ use std::fmt;
 
 use crate::{
     decode::{
-        bit_reverse, bits_to_bytes, bytes_to_bits, crc16, depuncture, new_viterbi,
-        qpsk_symbol_demapper, scramble, Viterbi,
+        Viterbi, bit_reverse, bits_to_bytes, bytes_to_bits, crc16, depuncture, new_viterbi,
+        qpsk_symbol_demapper, scramble,
     },
     fic::new_frame,
 };
 
 use super::{
-    fig::{fig_header, Fig},
     FastInformationBlock, FastInformationChannelBuffer, FastInformationChannelFrame,
+    fig::{Fig, fig_header},
 };
 
 pub struct FastInformationChannelDecoder {

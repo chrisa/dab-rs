@@ -1,11 +1,11 @@
 use std::thread::JoinHandle;
 
-use crate::fic::ensemble::Service;
+use crate::msc::cif::MainServiceChannel;
 
 pub mod file;
 pub mod wavefinder;
 
 pub trait Source {
     fn run(&self) -> JoinHandle<()>;
-    fn select_service(&mut self, service: &Service);
+    fn select_channel(&mut self, channel: &MainServiceChannel);
 }

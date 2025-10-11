@@ -71,7 +71,10 @@ impl Wavefinder {
         self.tune_msg(rc, 22, LMX2331A, lband);
 
         /* Load the RF N counter of the Band L PLL - constants */
-        rc = 0x300000 | (reverse_bits(NRFA_2331A, 7) << 13) | (reverse_bits(NRFB_2331A, 11) << 2) | 2;
+        rc = 0x300000
+            | (reverse_bits(NRFA_2331A, 7) << 13)
+            | (reverse_bits(NRFB_2331A, 11) << 2)
+            | 2;
         self.tune_msg(rc, 22, LMX2331A, lband);
 
         /* Load the IF R counter of the Band L PLL - constants */
@@ -83,7 +86,10 @@ impl Wavefinder {
         let f_vco = f_vcod.ceil() as u32; /* TODO: Necessary ?  Seems to be *essential* */
 
         /* Load the IF N counter of the Band L PLL - constants */
-        rc = 0x200000 | (reverse_bits(NIFA_2331A, 7) << 13) | (reverse_bits(NIFB_2331A, 11) << 2) | 2;
+        rc = 0x200000
+            | (reverse_bits(NIFA_2331A, 7) << 13)
+            | (reverse_bits(NIFB_2331A, 11) << 2)
+            | 2;
         self.tune_msg(rc, 22, LMX2331A, lband);
 
         let b_1511 = f_vco / P_1511;

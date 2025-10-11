@@ -1,15 +1,15 @@
-use rustfft::num_complex::c64;
 use rustfft::num_complex::Complex64;
+use rustfft::num_complex::c64;
 
+use crate::prs::PRS_POINTS;
+use crate::prs::PhaseReferenceArray;
+use crate::prs::PhaseReferenceSymbol;
 use crate::prs::fft::*;
 use crate::prs::maths::*;
 use crate::prs::reference::prs_reference_1_2;
-use crate::prs::PhaseReferenceArray;
-use crate::prs::PhaseReferenceSymbol;
-use crate::prs::PRS_POINTS;
+use crate::wavefinder::Message;
 use crate::wavefinder::mem_write_msg;
 use crate::wavefinder::timing_msg;
-use crate::wavefinder::Message;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;

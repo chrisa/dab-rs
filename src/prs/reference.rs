@@ -1,5 +1,5 @@
 use crate::prs::PhaseReferenceArray;
-use rustfft::num_complex::{c64, Complex64};
+use rustfft::num_complex::{Complex64, c64};
 use std::str::FromStr;
 
 // /* From ETSI EN 300 401 V1.3.3 Sect.14.3.2 Table 48 */

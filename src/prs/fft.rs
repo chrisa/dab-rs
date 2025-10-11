@@ -1,5 +1,5 @@
-use rustfft::num_complex::{c64, Complex64};
 use rustfft::FftPlanner;
+use rustfft::num_complex::{Complex64, c64};
 
 // static void vec_reverse_real(fftw_complex *vec, int pts)
 // {

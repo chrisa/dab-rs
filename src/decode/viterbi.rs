@@ -18,8 +18,8 @@ const METS_SZ: usize = 1 << N; // 16
 const TABLE49_LEN: usize = 1536; // computed from original algorithm
 
 pub struct Viterbi {
-    table49: Vec<i32>,   // length TABLE49_LEN (1536)
-    syms: Vec<usize>,    // length SYMS_SZ (128)
+    table49: Vec<i32>, // length TABLE49_LEN (1536)
+    syms: Vec<usize>,  // length SYMS_SZ (128)
 }
 
 pub fn new_viterbi() -> Viterbi {
@@ -191,7 +191,7 @@ impl Viterbi {
             // compute mets (16 branch metrics) from the next N bits
             // mets index is 0..16, constructed from bits[symbol_offset .. symbol_offset+N-1]
             // compute using bitpacking
-            for i in 0..METS_SZ {
+            for (i, met) in mets.iter_mut().enumerate() {
                 let mut acc = 0i32;
                 // build from MSB to LSB to match original
                 for j in 0..N {
@@ -200,7 +200,7 @@ impl Viterbi {
                     let bit_idx = (i >> (N - j - 1)) & 1;
                     acc += metrics[bit_idx][if bit { 1 } else { 0 }];
                 }
-                mets[i] = acc;
+                *met = acc;
             }
             symbol_offset += N;
 

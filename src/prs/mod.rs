@@ -1,5 +1,5 @@
 use crate::wavefinder::Buffer;
-use rustfft::num_complex::{c64, Complex64};
+use rustfft::num_complex::{Complex64, c64};
 use std::convert::TryFrom;
 
 mod fft;
@@ -54,9 +54,10 @@ impl PhaseReferenceSymbol {
             return;
         }
         if let Ok(prs_buffer) = TryInto::<PhaseReferenceBuffer>::try_into(buffer)
-            && prs_buffer.block == self.next_block {
-                self.append_data(&prs_buffer);
-            }
+            && prs_buffer.block == self.next_block
+        {
+            self.append_data(&prs_buffer);
+        }
     }
 
     fn append_data(&mut self, buffer: &PhaseReferenceBuffer) {

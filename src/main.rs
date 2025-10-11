@@ -9,12 +9,15 @@
 use std::sync::mpsc::{self, Receiver};
 
 use clap::Parser;
-use dab::fic::{
-    ensemble::{new_ensemble, Ensemble, Service},
-    FastInformationChannelBuffer,
-};
 use dab::source::Source;
 use dab::wavefinder::Buffer;
+use dab::{
+    fic::{
+        FastInformationChannelBuffer,
+        ensemble::{Ensemble, new_ensemble},
+    },
+    msc::cif::{MainServiceChannel, new_channel},
+};
 
 #[derive(Debug, Clone, clap::ValueEnum, PartialEq)]
 enum CliSource {
@@ -69,8 +72,9 @@ impl<'a> DABReceiver<'a> {
         // If service, MSC
         if let Some(service) = ens.find_service(&self.service_name) {
             println!("Service '{}' found, playing", &self.service_name);
-            self.source.as_mut().select_service(service);
-            self.msc(service);
+            let mut msc = new_channel(service);
+            self.source.as_mut().select_channel(&msc);
+            self.msc(&mut msc);
             t.join().unwrap();
         } else {
             println!("Service '{}' not found in ensemble", &self.service_name);
@@ -86,29 +90,31 @@ impl<'a> DABReceiver<'a> {
             if buffer.last {
                 break;
             }
-            if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer) {
-                if let Some(fibs) = fic_decoder.try_buffer(fic_buffer) {
-                    for fib in fibs {
-                        let figs = fic_decoder.extract_figs(&fib);
-                        for fig in figs {
-                            ens.add_fig(fig);
-                        }
+            if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer)
+                && let Some(fibs) = fic_decoder.try_buffer(fic_buffer)
+            {
+                for fib in fibs {
+                    let figs = fic_decoder.extract_figs(&fib);
+                    for fig in figs {
+                        ens.add_fig(fig);
                     }
-                    if ens.is_complete() {
-                        break;
-                    }
+                }
+                if ens.is_complete() {
+                    break;
                 }
             }
         }
         ens
     }
 
-    fn msc(&self, service: &Service) {
+    fn msc(&self, channel: &mut MainServiceChannel) {
         while let Ok(buffer) = self.rx.recv() {
             if buffer.last {
                 break;
             }
-            // dbg!(buffer);
+
+            channel.try_buffer(&buffer);
+            dbg!(&channel);
         }
     }
 }
