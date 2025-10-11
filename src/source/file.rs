@@ -6,7 +6,7 @@ use std::{
     thread::{self, JoinHandle},
 };
 
-use crate::{msc::cif::MainServiceChannel, wavefinder::Buffer};
+use crate::{msc::MainServiceChannel, wavefinder::Buffer};
 
 use super::Source;
 

@@ -1,7 +1,7 @@
 use rustfft::num_complex::Complex64;
 use rustfft::num_complex::c64;
 
-use crate::msc::cif::MainServiceChannel;
+use crate::msc::MainServiceChannel;
 use crate::prs::PRS_POINTS;
 use crate::prs::PhaseReferenceArray;
 use crate::prs::PhaseReferenceSymbol;

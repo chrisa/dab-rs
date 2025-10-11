@@ -1,6 +1,6 @@
 use std::thread::JoinHandle;
 
-use crate::msc::cif::MainServiceChannel;
+use crate::msc::MainServiceChannel;
 
 pub mod file;
 pub mod wavefinder;

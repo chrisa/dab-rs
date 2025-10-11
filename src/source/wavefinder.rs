@@ -7,7 +7,7 @@ use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
-use crate::msc::cif::MainServiceChannel;
+use crate::msc::MainServiceChannel;
 use crate::prs;
 use crate::prs::sync::{PhaseReferenceSynchroniser, new_synchroniser};
 use crate::wavefinder;

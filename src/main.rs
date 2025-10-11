@@ -16,7 +16,7 @@ use dab::{
         FastInformationChannelBuffer,
         ensemble::{Ensemble, new_ensemble},
     },
-    msc::cif::{MainServiceChannel, new_channel},
+    msc::{MainServiceChannel, new_channel},
 };
 
 #[derive(Debug, Clone, clap::ValueEnum, PartialEq)]
