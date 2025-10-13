@@ -131,9 +131,8 @@ impl FastInformationChannelDecoder {
                 return Err("crc check failed");
             }
 
-            // If OK, convert to bytes
-            let bytes = bits_to_bytes(&fibs[i]);
-            fib_bytes[i].copy_from_slice(&bytes);
+            // If OK, convert to bytes, first 30 only.
+            fib_bytes[i].copy_from_slice(&bits_to_bytes(&fibs[i])[0..30]);
         }
 
         let blocks = fib_bytes

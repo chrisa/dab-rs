@@ -4,8 +4,10 @@
 use libm::erf;
 use std::f64::consts::SQRT_2;
 
-const K: usize = 7;
+/* Constraint length */
 const N: usize = 4;
+/* Number of symbols per data bit */
+const K: usize = 7;
 
 const LONGBITS: usize = 32;
 const LOGLONGBITS: usize = 5;
@@ -144,12 +146,8 @@ impl Viterbi {
     }
 
     /// Viterbi decoder core.
-    /// - `bits` must be length 3096 (original code) and contain 0/1 in each u8.
-    /// - returns Vec<u8> of length 768 with decoded bits (0/1).
     pub fn viterbi(&self, bits: &[u8]) -> Vec<u8> {
-        // Keep same sizes as original
-        const NBITS: usize = 768usize;
-        assert!(bits.len() == 3096usize, "expected 3096 input bits (u8)");
+        let NBITS = bits.len() / N - (K - 1);
 
         // output
         let mut result = vec![0u8; NBITS];

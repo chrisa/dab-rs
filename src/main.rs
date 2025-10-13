@@ -120,8 +120,9 @@ impl<'a> DABReceiver<'a> {
                 break;
             }
 
-            channel.try_buffer(&buffer);
-            // dbg!(&channel);
+            if let Some(main) = channel.try_buffer(&buffer) {
+                // dbg!(&main);
+            }
         }
     }
 }

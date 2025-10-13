@@ -1,16 +1,18 @@
+use crate::msc::decoder::{MainServiceChannelDecoder, new_decoder};
 use crate::{fic::ensemble::Service, wavefinder::Buffer};
 use bitvec::prelude::*;
+use enum_dispatch::enum_dispatch;
 use std::fmt;
 use std::ops::Range;
-use enum_dispatch::enum_dispatch;
 
 mod cif;
+mod decoder;
+pub mod tables;
 
 #[enum_dispatch]
 trait BufferOps {
     fn reset(&mut self);
-    fn push_buffer(&mut self, buffer: &MainServiceChannelBuffer, i: usize, j: usize);
-    fn frame_complete(&self) -> bool;
+    fn push_buffer(&mut self, buffer: &MainServiceChannelBuffer) -> bool;
 }
 
 #[derive(Debug)]
@@ -21,6 +23,13 @@ enum SizedBuffer {
     Three(Buffers<3>),
 }
 
+pub struct Buffers<const N: usize> {
+    sym: usize,
+    lframe: usize,
+    full: bool,
+    pub symbols: [[Option<MainServiceChannelBuffer>; N]; 16],
+}
+
 #[derive(Debug)]
 pub struct MainServiceChannel<'a> {
     service: &'a Service,
@@ -28,11 +37,7 @@ pub struct MainServiceChannel<'a> {
     cur_frame: u8,
     cifcnt: u64,
     buffers: SizedBuffer,
-}
-
-// all symbols for one frame
-pub struct Buffers<const N: usize> {
-    symbols: [[Option<MainServiceChannelBuffer>; N]; 4],
+    decoder: MainServiceChannelDecoder,
 }
 
 impl<const N: usize> fmt::Debug for Buffers<{ N }> {
@@ -49,37 +54,48 @@ impl<const N: usize> fmt::Debug for Buffers<{ N }> {
     }
 }
 
-impl<const N: usize> BufferOps for Buffers<{N}> {
-
+impl<const N: usize> BufferOps for Buffers<{ N }> {
     fn reset(&mut self) {
-        self.symbols = [[None; N]; 4];
+        self.symbols = [[None; N]; 16];
+        self.sym = 0;
+        self.lframe = 0;
     }
 
-    fn push_buffer(&mut self, buffer: &MainServiceChannelBuffer, i: usize, j: usize) {
-        self.symbols[i][j] = Some(*buffer);
-    }
-
-    fn frame_complete(&self) -> bool {
-        for sym in self.symbols {
-            for buf in sym {
-                if buf.is_none() {
-                    return false;
-                }
+    fn push_buffer(&mut self, buffer: &MainServiceChannelBuffer) -> bool {
+        // println!("push buffer: lframe: {} sym: {}", self.lframe, self.sym);
+        self.symbols[self.lframe][self.sym] = Some(*buffer);
+        self.sym = (self.sym + 1) % N;
+        if self.sym == 0 {
+            self.lframe = (self.lframe + 1) % 16;
+            if self.lframe == 0 {
+                self.full = true;
             }
         }
-        true
+
+        // complete frame?
+        self.sym == 0 && self.full
     }
 }
 
 // one symbol, deinterleaved
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct MainServiceChannelBuffer {
-    bytes: [u8; 3072],
+    bits: [u8; 3072],
+}
+
+impl fmt::Debug for MainServiceChannelBuffer {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "MSCBuffer - {} non-zeros",
+            self.bits.iter().filter(|a| **a != 0).count()
+        )
+    }
 }
 
 impl Default for MainServiceChannelBuffer {
     fn default() -> Self {
-        Self { bytes: [0; 3072] }
+        Self { bits: [0; 3072] }
     }
 }
 
@@ -108,16 +124,26 @@ pub struct ChannelSymbols {
 }
 
 pub fn new_channel(service: &Service) -> MainServiceChannel<'_> {
+    let decoder = new_decoder();
     let symbols = cif::channel_symbols(service);
     let buffers = match symbols.count {
         1 => SizedBuffer::One(Buffers::<1> {
-            symbols: [[None; 1]; 4],
+            symbols: [[None; 1]; 16],
+            sym: 0,
+            lframe: 0,
+            full: false,
         }),
         2 => SizedBuffer::Two(Buffers::<2> {
-            symbols: [[None; 2]; 4],
+            symbols: [[None; 2]; 16],
+            sym: 0,
+            lframe: 0,
+            full: false,
         }),
         3 => SizedBuffer::Three(Buffers::<3> {
-            symbols: [[None; 3]; 4],
+            symbols: [[None; 3]; 16],
+            sym: 0,
+            lframe: 0,
+            full: false,
         }),
         _ => panic!("unexpected count"),
     };
@@ -127,46 +153,72 @@ pub fn new_channel(service: &Service) -> MainServiceChannel<'_> {
         cur_frame: 0,
         cifcnt: 0,
         buffers,
+        decoder,
     }
 }
 
-pub struct MainBlock {
-
+#[derive(Debug)]
+pub struct MainServiceChannelFrame {
+    frame: u8,
 }
 
 impl<'a> MainServiceChannel<'a> {
-    pub fn try_buffer(&mut self, buffer: &Buffer) -> Option<MainBlock> {
-        let frame_symbol = buffer.bytes[2];
-        let frame: u8 = buffer.bytes[3];
+    pub fn try_buffer(&mut self, buffer: &Buffer) -> Option<MainServiceChannelFrame> {
+        let symbol = buffer.bytes[2];
+        let frame = buffer.bytes[3];
 
-        if frame_symbol == self.symbols.ranges[0].start {
+        let mut buffer_full = false;
+
+        // println!("symbol: {} frame: {} cur_frame: {}", symbol, frame, self.cur_frame);
+
+        if symbol == self.symbols.ranges[0].start {
             self.cur_frame = frame;
-            self.buffers.reset();
-            self.buffers.push_buffer(&self.deinterleave(buffer), 0, 0);
-        }
-
-        for (i, range) in self.symbols.ranges.iter().enumerate() {
-            for (j, symbol) in range.symbols().enumerate() {
-                if frame_symbol == symbol && frame == self.cur_frame {
-                    self.buffers.push_buffer(&self.deinterleave(buffer), i, j);
+            buffer_full = self.buffers.push_buffer(&self.deinterleave(buffer));
+        } else {
+            for range in &self.symbols.ranges[1..4] {
+                if symbol == range.start {
+                    if frame == self.cur_frame {
+                        buffer_full = self.buffers.push_buffer(&self.deinterleave(buffer));
+                    } else {
+                        println!("reset!");
+                        self.buffers.reset();
+                    }
+                }
+            }
+            for range in &self.symbols.ranges {
+                if symbol > range.start && symbol <= range.end {
+                    if frame == self.cur_frame {
+                        buffer_full = self.buffers.push_buffer(&self.deinterleave(buffer));
+                        if symbol == range.end {
+                            self.cifcnt = self.cifcnt + 1;
+                        }
+                    } else {
+                        println!("reset!");
+                        self.buffers.reset();
+                    }
                 }
             }
         }
 
-        if self.buffers.frame_complete() {
-            Some(self.decode())
-        }
-        else {
+        if buffer_full {
+            // println!("buffer full");
+            let block = Some(self.decode());
+            block
+        } else {
             None
         }
     }
 
-    fn decode(&self) -> MainBlock {
-        MainBlock {  } // run viterbi -> return data for PAD / MPEG
+    fn decode(&self) -> MainServiceChannelFrame {
+        self.decoder
+            .decode(&self.buffers, self.service.subchannel(), &self.symbols);
+        MainServiceChannelFrame {
+            frame: self.cur_frame,
+        }
     }
 
-    fn deinterleave(&self, _buffer: &Buffer) -> MainServiceChannelBuffer {
-        MainServiceChannelBuffer::default() // run deinterleave
+    fn deinterleave(&self, buffer: &Buffer) -> MainServiceChannelBuffer {
+        self.decoder.deinterleave(buffer)
     }
 
     pub fn selstr(&self) -> [u8; 10] {

@@ -1,5 +1,6 @@
 mod viterbi;
 
+use itertools::Itertools;
 pub use viterbi::Viterbi;
 pub use viterbi::new_viterbi;
 
@@ -13,7 +14,7 @@ pub fn bit_reverse(bits: &mut [u8]) {
 }
 
 pub fn bytes_to_bits(bytes: &[u8]) -> Vec<u8> {
-    let mut bits = vec![];
+    let mut bits = Vec::with_capacity(bytes.len() * 8);
 
     for byte in bytes {
         for j in 0..8 {
@@ -24,22 +25,18 @@ pub fn bytes_to_bits(bytes: &[u8]) -> Vec<u8> {
     bits
 }
 
-pub fn bits_to_bytes(bits: &[u8; 256]) -> [u8; 30] {
-    let mut i = 0;
-    let mut j = 0;
-    let mut result: [u8; 30] = [0; 30];
-    loop {
-        result[j] = (bits[i]<<7) + (bits[i+1]<<6) + (bits[i+2]<<5) + (bits[i+3]<<4) +       //be
-        (bits[i+4]<<3) + (bits[i+5]<<2) + (bits[i+6]<<1) + bits[i+7];
+pub fn bits_to_bytes(bits: &[u8]) -> Vec<u8> {
+    assert!(bits.len().is_multiple_of(8));
+    let mut bytes = Vec::with_capacity(bits.len() / 8);
 
-        j += 1;
-        i += 8;
-        if i >= 240 {
-            break;
-        }
+    for mut chunk in &bits.into_iter().chunks(8) {
+        bytes.push(
+            (chunk.next().unwrap()<<7) + (chunk.next().unwrap()<<6) + (chunk.next().unwrap()<<5) + (chunk.next().unwrap()<<4) + //be
+            (chunk.next().unwrap()<<3) + (chunk.next().unwrap()<<2) + (chunk.next().unwrap()<<1) +  chunk.next().unwrap()
+        );
     }
 
-    result
+    bytes
 }
 
 pub fn qpsk_symbol_demapper(bits: &[u8]) -> Vec<u8> {

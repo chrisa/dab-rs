@@ -6,6 +6,8 @@ use std::{collections::HashMap, sync::atomic::AtomicU64};
 
 use super::fig::{Fig, FigType, Information, LabelPurpose, ServiceComponent};
 
+use crate::msc::tables::{UEPTABLE, UepProf};
+
 pub struct Ensemble {
     id: u16,
     name: String,
@@ -30,6 +32,7 @@ pub struct AudioSubChannel {
     size: u16,
     protlvl: u8,
     prot: Protection,
+    uep_index: usize,
 }
 
 #[derive(Debug)]
@@ -47,9 +50,10 @@ pub struct DataSubChannel {
     packet_addr: u16,
     scca: u16,
     prot: Protection,
+    uep_index: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Protection {
     Unknown,
     EEP,
@@ -83,6 +87,7 @@ pub fn new_subchannel(id: u8, primary: bool) -> AudioSubChannel {
         size: 0,
         protlvl: 0,
         prot: Protection::Unknown,
+        uep_index: 0,
     }
 }
 
@@ -101,75 +106,76 @@ pub fn new_data_subchannel(id: u16, primary: bool) -> DataSubChannel {
         packet_addr: 0,
         scca: 0,
         prot: Protection::Unknown,
+        uep_index: 0,
     }
 }
 
-static UEP: [(u16, u16, u8); 64] = [
-    (32, 16, 5),
-    (32, 21, 4),
-    (32, 24, 3),
-    (32, 29, 2),
-    (32, 35, 1),
-    (48, 24, 5),
-    (48, 29, 4),
-    (48, 35, 3),
-    (48, 42, 2),
-    (48, 52, 1),
-    (56, 29, 5),
-    (56, 35, 4),
-    (56, 42, 3),
-    (56, 52, 2),
-    (64, 32, 5),
-    (64, 42, 4),
-    (64, 48, 3),
-    (64, 58, 2),
-    (64, 70, 1),
-    (80, 40, 5),
-    (80, 52, 4),
-    (80, 58, 3),
-    (80, 70, 2),
-    (80, 84, 1),
-    (96, 48, 5),
-    (96, 58, 4),
-    (96, 70, 3),
-    (96, 84, 2),
-    (96, 104, 1),
-    (112, 58, 5),
-    (112, 70, 4),
-    (112, 84, 3),
-    (112, 104, 2),
-    (128, 64, 5),
-    (128, 84, 4),
-    (128, 96, 3),
-    (128, 116, 2),
-    (128, 140, 1),
-    (160, 80, 5),
-    (160, 104, 4),
-    (160, 116, 3),
-    (160, 140, 2),
-    (160, 168, 1),
-    (192, 96, 5),
-    (192, 116, 4),
-    (192, 140, 3),
-    (192, 168, 2),
-    (192, 208, 1),
-    (224, 116, 5),
-    (224, 140, 4),
-    (224, 168, 3),
-    (224, 208, 2),
-    (224, 232, 1),
-    (256, 128, 5),
-    (256, 168, 4),
-    (256, 192, 3),
-    (256, 232, 2),
-    (256, 280, 1),
-    (320, 160, 5),
-    (320, 208, 4),
-    (320, 280, 2),
-    (384, 192, 5),
-    (384, 280, 3),
-    (384, 416, 1),
-];
+// static UEP: [(u16, u16, u8); 64] = [
+//     (32, 16, 5),
+//     (32, 21, 4),
+//     (32, 24, 3),
+//     (32, 29, 2),
+//     (32, 35, 1),
+//     (48, 24, 5),
+//     (48, 29, 4),
+//     (48, 35, 3),
+//     (48, 42, 2),
+//     (48, 52, 1),
+//     (56, 29, 5),
+//     (56, 35, 4),
+//     (56, 42, 3),
+//     (56, 52, 2),
+//     (64, 32, 5),
+//     (64, 42, 4),
+//     (64, 48, 3),
+//     (64, 58, 2),
+//     (64, 70, 1),
+//     (80, 40, 5),
+//     (80, 52, 4),
+//     (80, 58, 3),
+//     (80, 70, 2),
+//     (80, 84, 1),
+//     (96, 48, 5),
+//     (96, 58, 4),
+//     (96, 70, 3),
+//     (96, 84, 2),
+//     (96, 104, 1),
+//     (112, 58, 5),
+//     (112, 70, 4),
+//     (112, 84, 3),
+//     (112, 104, 2),
+//     (128, 64, 5),
+//     (128, 84, 4),
+//     (128, 96, 3),
+//     (128, 116, 2),
+//     (128, 140, 1),
+//     (160, 80, 5),
+//     (160, 104, 4),
+//     (160, 116, 3),
+//     (160, 140, 2),
+//     (160, 168, 1),
+//     (192, 96, 5),
+//     (192, 116, 4),
+//     (192, 140, 3),
+//     (192, 168, 2),
+//     (192, 208, 1),
+//     (224, 116, 5),
+//     (224, 140, 4),
+//     (224, 168, 3),
+//     (224, 208, 2),
+//     (224, 232, 1),
+//     (256, 128, 5),
+//     (256, 168, 4),
+//     (256, 192, 3),
+//     (256, 232, 2),
+//     (256, 280, 1),
+//     (320, 160, 5),
+//     (320, 208, 4),
+//     (320, 280, 2),
+//     (384, 192, 5),
+//     (384, 280, 3),
+//     (384, 416, 1),
+// ];
 
 // fn service_name_matches(a: &str, b: &str) -> bool {
 //     a.trim_end() == b
@@ -324,16 +330,17 @@ impl Ensemble {
                             if let Some(SId) = self.find_service_for_subchannel(SubChId)
                                 && TabIndx < 64
                             {
-                                let (BitRate, SubChSz, ProtLvl) = UEP[TabIndx as usize];
+                                let uep = UEPTABLE[TabIndx as usize];
                                 self.set_service_subchannel_info(
                                     SId,
                                     SubChId,
                                     StartAddr,
-                                    BitRate,
-                                    SubChSz,
-                                    ProtLvl,
+                                    uep.BitRate,
+                                    uep.SubChSz,
+                                    uep.ProtLvl,
                                     0,
                                     Protection::UEP,
+                                    TabIndx as usize,
                                 );
                             }
                         }
@@ -354,6 +361,7 @@ impl Ensemble {
                                     ProtLvl,
                                     Opt,
                                     Protection::EEP,
+                                    0,
                                 );
                             }
                         }
@@ -436,6 +444,7 @@ impl Ensemble {
         protlvl: u8,
         opt: u8,
         prot: Protection,
+        uep_index: usize,
     ) {
         if let Some(service) = self.services.get_mut(&service_id) {
             if let Some(subchannel) = service.audio_subchannels.get_mut(&subchannel_id) {
@@ -444,6 +453,7 @@ impl Ensemble {
                 subchannel.size = size;
                 subchannel.protlvl = protlvl;
                 subchannel.prot = prot;
+                subchannel.uep_index = uep_index;
                 return;
             }
             for data_subchannel in service.data_subchannels.values_mut() {
@@ -453,6 +463,7 @@ impl Ensemble {
                     data_subchannel.protlvl = protlvl;
                     data_subchannel.opt = opt;
                     data_subchannel.prot = prot;
+                    data_subchannel.uep_index = uep_index;
                     return;
                 }
             }
@@ -523,9 +534,18 @@ impl Service {
     }
 }
 
+#[derive(Debug)]
+pub enum SubChannelType {
+    Audio,
+    Data,
+}
+
 pub trait SubChannel {
     fn startaddr(&self) -> u16;
     fn size(&self) -> u16;
+    fn protection(&self) -> Protection;
+    fn subchannel_type(&self) -> SubChannelType;
+    fn uep_profile(&self) -> Option<UepProf>;
 }
 
 impl SubChannel for AudioSubChannel {
@@ -535,6 +555,18 @@ impl SubChannel for AudioSubChannel {
     fn size(&self) -> u16 {
         self.size
     }
+    fn protection(&self) -> Protection {
+        self.prot
+    }
+    fn subchannel_type(&self) -> SubChannelType {
+        SubChannelType::Audio
+    }
+    fn uep_profile(&self) -> Option<UepProf> {
+        if self.prot == Protection::UEP {
+            return Some(UEPTABLE[self.uep_index]);
+        }
+        None
+    }
 }
 
 impl SubChannel for DataSubChannel {
@@ -543,5 +575,17 @@ impl SubChannel for DataSubChannel {
     }
     fn size(&self) -> u16 {
         self.size
+    }
+    fn protection(&self) -> Protection {
+        self.prot
+    }
+    fn subchannel_type(&self) -> SubChannelType {
+        SubChannelType::Data
+    }
+    fn uep_profile(&self) -> Option<UepProf> {
+        if self.prot == Protection::UEP {
+            return Some(UEPTABLE[self.uep_index]);
+        }
+        None
     }
 }
