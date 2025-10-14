@@ -1,6 +1,7 @@
 #![allow(non_snake_case)]
 
 use itertools::Itertools;
+use std::any::Any;
 use std::sync::atomic::Ordering::Relaxed;
 use std::{collections::HashMap, sync::atomic::AtomicU64};
 
@@ -546,6 +547,8 @@ pub trait SubChannel {
     fn protection(&self) -> Protection;
     fn subchannel_type(&self) -> SubChannelType;
     fn uep_profile(&self) -> Option<UepProf>;
+    fn bitrate(&self) -> u16;
+    // fn as_any(&self) -> &dyn Any;
 }
 
 impl SubChannel for AudioSubChannel {
@@ -567,6 +570,12 @@ impl SubChannel for AudioSubChannel {
         }
         None
     }
+    fn bitrate(&self) -> u16 {
+        self.bitrate
+    }
+    // fn as_any(&self) -> &dyn Any {
+    //     self
+    // }    
 }
 
 impl SubChannel for DataSubChannel {
@@ -588,4 +597,10 @@ impl SubChannel for DataSubChannel {
         }
         None
     }
+    fn bitrate(&self) -> u16 {
+        0
+    }
+    // fn as_any(&self) -> &dyn Any {
+    //     self
+    // }    
 }

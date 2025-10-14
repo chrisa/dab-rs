@@ -18,6 +18,8 @@ use dab::{
     },
     msc::{MainServiceChannel, new_channel},
 };
+use dab::pad;
+use dab::output::mpeg;
 
 #[derive(Debug, Clone, clap::ValueEnum, PartialEq)]
 enum CliSource {
@@ -115,6 +117,9 @@ impl<'a> DABReceiver<'a> {
     }
 
     fn msc(&self, channel: &mut MainServiceChannel) {
+        // let mut pad = pad::PadState::new();
+        let mut mpeg = mpeg::new_mpeg();
+
         while let Ok(buffer) = self.rx.recv() {
             if buffer.last {
                 break;
@@ -122,6 +127,8 @@ impl<'a> DABReceiver<'a> {
 
             if let Some(main) = channel.try_buffer(&buffer) {
                 // dbg!(&main);
+                // pad::wfpad(&mut pad, &main.bits);
+                mpeg.output(&main);
             }
         }
     }

@@ -62,7 +62,7 @@ impl<const N: usize> BufferOps for Buffers<{ N }> {
     }
 
     fn push_buffer(&mut self, buffer: &MainServiceChannelBuffer) -> bool {
-        // println!("push buffer: lframe: {} sym: {}", self.lframe, self.sym);
+        // dbg!("push buffer: lframe: {} sym: {}", self.lframe, self.sym);
         self.symbols[self.lframe][self.sym] = Some(*buffer);
         self.sym = (self.sym + 1) % N;
         if self.sym == 0 {
@@ -159,7 +159,9 @@ pub fn new_channel(service: &Service) -> MainServiceChannel<'_> {
 
 #[derive(Debug)]
 pub struct MainServiceChannelFrame {
-    frame: u8,
+    pub frame: u8,
+    pub bitrate: u16,
+    pub bits: Vec<u8>,
 }
 
 impl<'a> MainServiceChannel<'a> {
@@ -169,7 +171,7 @@ impl<'a> MainServiceChannel<'a> {
 
         let mut buffer_full = false;
 
-        // println!("symbol: {} frame: {} cur_frame: {}", symbol, frame, self.cur_frame);
+        // dbg!("symbol: {} frame: {} cur_frame: {}", symbol, frame, self.cur_frame);
 
         if symbol == self.symbols.ranges[0].start {
             self.cur_frame = frame;
@@ -180,7 +182,7 @@ impl<'a> MainServiceChannel<'a> {
                     if frame == self.cur_frame {
                         buffer_full = self.buffers.push_buffer(&self.deinterleave(buffer));
                     } else {
-                        println!("reset!");
+                        dbg!("reset!");
                         self.buffers.reset();
                     }
                 }
@@ -193,7 +195,7 @@ impl<'a> MainServiceChannel<'a> {
                             self.cifcnt = self.cifcnt + 1;
                         }
                     } else {
-                        println!("reset!");
+                        dbg!("reset!");
                         self.buffers.reset();
                     }
                 }
@@ -201,7 +203,7 @@ impl<'a> MainServiceChannel<'a> {
         }
 
         if buffer_full {
-            // println!("buffer full");
+            // dbg!("buffer full");
             let block = Some(self.decode());
             block
         } else {
@@ -210,10 +212,15 @@ impl<'a> MainServiceChannel<'a> {
     }
 
     fn decode(&self) -> MainServiceChannelFrame {
-        self.decoder
-            .decode(&self.buffers, self.service.subchannel(), &self.symbols);
+        let bits = self.decoder.decode(&self.buffers, self.service.subchannel(), &self.symbols);
+        // let bitrate = if let Some(asc) = self.service.subchannel().as_any().downcast_ref::<AudioSubChannel>() {
+        //     asc.bitrate
+        // }
+        let bitrate = self.service.subchannel().bitrate();
         MainServiceChannelFrame {
             frame: self.cur_frame,
+            bitrate,
+            bits,
         }
     }
 

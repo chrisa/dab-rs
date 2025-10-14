@@ -37,7 +37,7 @@ impl MainServiceChannelDecoder {
         }
     }
 
-    pub fn decode(&self, buffers: &SizedBuffer, sc: &dyn SubChannel, sym: &ChannelSymbols) {
+    pub fn decode(&self, buffers: &SizedBuffer, sc: &dyn SubChannel, sym: &ChannelSymbols) -> Vec<u8> {
 
         // time disinterleave
         let dis = match buffers {
@@ -57,12 +57,18 @@ impl MainServiceChannelDecoder {
             (t, p) => panic!("unexpected subchannel configuration: {:?} {:?}", t, p),
         };
 
-        let out = bits_to_bytes(&scramble(&self.viterbi.viterbi(&depunctured)));
+        use pretty_hex::*;
+        // println!("{}", pretty_hex(&depunctured));
 
-        // use pretty_hex::*;
+        let vited = self.viterbi.viterbi(&depunctured, 129);
+        // println!("{}", pretty_hex(&vited));
+        let scrambled = scramble(&vited);
+        // println!("{}", pretty_hex(&scrambled));
+        let out = bits_to_bytes(&scrambled);
         // println!("{}", pretty_hex(&out));
 
         // -> PAD, MPEG
+        out
     }
 
     // /*
@@ -93,6 +99,8 @@ impl MainServiceChannelDecoder {
         const BITSPERCU: u16 = 64;
         let mut result = Vec::<u8>::with_capacity(sc.size() as usize * BITSPERCU as usize);
 
+        use pretty_hex::*;
+
         for i in 0..(sc.size() * BITSPERCU) as usize {
             let cif = TD_MAP[i % 16];
             let offset = (BITSPERCU * sym.startcu) as usize + i;
@@ -103,12 +111,15 @@ impl MainServiceChannelDecoder {
             // dbg!(&buffers.symbols);
 
             if let Some(buf) = buffers.symbols[cif][n] {
+                // println!("{}", pretty_hex(&buf.bits));
                 let bit = buf.bits[m];
                 result.push(bit);
             } else {
                 panic!("missing buffer!");
             }
         }
+
+        // println!("{}", pretty_hex(&result));
 
         result
     }

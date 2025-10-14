@@ -146,7 +146,8 @@ impl Viterbi {
     }
 
     /// Viterbi decoder core.
-    pub fn viterbi(&self, bits: &[u8]) -> Vec<u8> {
+    /// Bits expected to be 0/1
+    pub fn viterbi(&self, bits: &[u8], truth: u8) -> Vec<u8> {
         let NBITS = bits.len() / N - (K - 1);
 
         // output
@@ -194,7 +195,8 @@ impl Viterbi {
                 // build from MSB to LSB to match original
                 for j in 0..N {
                     let bindex = symbol_offset + j;
-                    let bit = bits[bindex] != 0;
+                    // let bit = bits[bindex] != 0;
+                    let bit = bits[bindex] == truth;
                     let bit_idx = (i >> (N - j - 1)) & 1;
                     acc += metrics[bit_idx][if bit { 1 } else { 0 }];
                 }
