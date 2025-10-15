@@ -252,8 +252,8 @@ impl Ensemble {
     }
 
     pub fn display(&self) {
-        println!("Ensemble:");
-        println!("{:16} (0x{:04x})", self.name, self.id);
+        eprintln!("Ensemble:");
+        eprintln!("{:16} (0x{:04x})", self.name, self.id);
         for service in self
             .services
             .values()
@@ -261,7 +261,7 @@ impl Ensemble {
         {
             for subchannel in service.audio_subchannels.values() {
                 let PS = if subchannel.primary { "Pri" } else { "Sec " };
-                println!(
+                eprintln!(
                     "{:16} (0x{:04x}) {} subch={} start={} size={} bitrate={} {:?}",
                     service.name,
                     service.id,
@@ -279,7 +279,7 @@ impl Ensemble {
                 } else {
                     "Sec "
                 };
-                println!(
+                eprintln!(
                     "{:16} (0x{:04x}) {} subch={} SCId={} start={} size={} addr={} {:?}",
                     service.name,
                     service.id,
@@ -293,7 +293,7 @@ impl Ensemble {
                 );
             }
         }
-        println!();
+        eprintln!();
     }
 
     pub fn add_fig(&mut self, fig: Fig) {

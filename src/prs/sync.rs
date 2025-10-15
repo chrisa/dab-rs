@@ -97,12 +97,12 @@ impl PhaseReferenceSynchroniser {
 
         if (c.abs() < (2.4609375e-4 / 2.0)) && (ir.abs() < 350.0) {
             if self.lock() {
-                // println!("locked: {:12.10} {:.2}", c, ir);
+                // eprintln!("locked: {:12.10} {:.2}", c, ir);
             } else {
-                println!("not yet locked: {:12.10} {:.2}", c, ir);
+                eprintln!("not yet locked: {:12.10} {:.2}", c, ir);
             }
         } else {
-            println!("unlocked: {:12.10} {:.2}", c, ir);
+            eprintln!("unlocked: {:12.10} {:.2}", c, ir);
             self.unlock();
         }
 

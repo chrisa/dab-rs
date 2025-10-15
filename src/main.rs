@@ -80,13 +80,13 @@ impl<'a> DABReceiver<'a> {
 
         // If service, MSC
         if let Some(service) = ens.find_service_by_id(&self.service_id) {
-            println!("Service ID '{:04x}' found, {}", service.id, service.name);
+            eprintln!("Service ID '{:04x}' found, {}", service.id, service.name);
             let mut msc = new_channel(service);
             self.source.as_mut().select_channel(&msc);
             self.msc(&mut msc);
             t.join().unwrap();
         } else {
-            println!("Service '{}' not found in ensemble", &self.service_id);
+            eprintln!("Service '{}' not found in ensemble", &self.service_id);
         }
     }
 
@@ -117,7 +117,7 @@ impl<'a> DABReceiver<'a> {
     }
 
     fn msc(&self, channel: &mut MainServiceChannel) {
-        // let mut pad = pad::PadState::new();
+        let mut pad = pad::new_padstate();
         let mut mpeg = mpeg::new_mpeg();
 
         while let Ok(buffer) = self.rx.recv() {
@@ -127,7 +127,7 @@ impl<'a> DABReceiver<'a> {
 
             if let Some(main) = channel.try_buffer(&buffer) {
                 // dbg!(&main);
-                // pad::wfpad(&mut pad, &main.bits);
+                pad.output(&main);
                 mpeg.output(&main);
             }
         }

@@ -57,6 +57,8 @@ impl MainServiceChannelDecoder {
             (t, p) => panic!("unexpected subchannel configuration: {:?} {:?}", t, p),
         };
 
+        // println!("bits: {}", depunctured.len());
+
         use pretty_hex::*;
         // println!("{}", pretty_hex(&depunctured));
 
@@ -125,7 +127,7 @@ impl MainServiceChannelDecoder {
     }
 
     fn eep_depuncture(&self, bits: &Vec<u8>, sc: &dyn SubChannel) -> Vec<u8> {
-        println!("eep got bits of len {}", bits.len());
+        // println!("eep got bits of len {}", bits.len());
         Vec::new()
     }
 
@@ -197,7 +199,7 @@ impl MainServiceChannelDecoder {
     }
 
     fn eep_depuncture_data(&self, bits: &Vec<u8>, sc: &dyn SubChannel) -> Vec<u8> {
-        println!("eep data got bits of len {}", bits.len());
+        // println!("eep data got bits of len {}", bits.len());
         Vec::new()
     }
 }

@@ -35,6 +35,7 @@ pub struct MainServiceChannel<'a> {
     service: &'a Service,
     symbols: ChannelSymbols,
     cur_frame: u8,
+    cur_sym: u8,
     cifcnt: u64,
     buffers: SizedBuffer,
     decoder: MainServiceChannelDecoder,
@@ -151,6 +152,7 @@ pub fn new_channel(service: &Service) -> MainServiceChannel<'_> {
         service,
         symbols,
         cur_frame: 0,
+        cur_sym: 0,
         cifcnt: 0,
         buffers,
         decoder,
@@ -169,9 +171,17 @@ impl<'a> MainServiceChannel<'a> {
         let symbol = buffer.bytes[2];
         let frame = buffer.bytes[3];
 
+        if symbol <= 4 {
+            return None;
+        }
+        if symbol == self.cur_sym {
+            return None;
+        }
+        self.cur_sym = symbol;
+
         let mut buffer_full = false;
 
-        // dbg!("symbol: {} frame: {} cur_frame: {}", symbol, frame, self.cur_frame);
+        // println!("subchsz: {} symbol: {} frame: {} cur_frame: {}", self.service.subchannel().size(), symbol, frame, self.cur_frame);
 
         if symbol == self.symbols.ranges[0].start {
             self.cur_frame = frame;

@@ -22,15 +22,21 @@ const TABLE49_LEN: usize = 1536; // computed from original algorithm
 pub struct Viterbi {
     table49: Vec<i32>, // length TABLE49_LEN (1536)
     syms: Vec<usize>,  // length SYMS_SZ (128)
+    metrics: Box<[[i32; 256]; 2]>,
 }
 
 pub fn new_viterbi() -> Viterbi {
     let mut v = Viterbi {
         table49: vec![0i32; TABLE49_LEN],
         syms: vec![0usize; SYMS_SZ],
+        metrics: Box::new([[0; 256]; 2]),
     };
     v.gen_table49();
     v.vd_init();
+
+    // v.gen_metrics();
+    // dbg!(&v.metrics);
+
     v
 }
 
@@ -63,6 +69,50 @@ const PARTAB: [u8; 256] = [
 const POLYS: [usize; 4] = [0x6d, 0x4f, 0x53, 0x6d]; /* k = 7; DAB */
 
 impl Viterbi {
+
+    fn gen_metrics(&mut self) {
+        let OFFSET: f64 = 128.0;
+        let amp: f64 = 1.0;
+        let noise: f64 = 1.0;
+        let bias: f64 = 0.0;
+        let scale: f64 = 4.0;
+
+        let mut metrics: [[f64; 256]; 2] = [[0.0; 256]; 2];
+
+        {
+            let p1 = normal(((0.0 - OFFSET + 0.5) / amp - 1.0) / noise);
+            let p0 = normal(((0.0 - OFFSET + 0.5) / amp + 1.0) / noise);
+            metrics[0][0] = (2.0 * p0 / (p1 + p0)).log2() - bias;
+            metrics[1][0] = (2.0 * p1 / (p1 + p0)).log2() - bias;
+        }
+
+        for s in 1..255 {
+            let p1 = normal(((s as f64 - OFFSET + 0.5) / amp - 1.0) / noise)
+                - normal(((s as f64 - OFFSET - 0.5) / amp - 1.0) / noise);
+            let p0 = normal(((s as f64 - OFFSET + 0.5) / amp + 1.0) / noise)
+                - normal(((s as f64 - OFFSET - 0.5) / amp + 1.0) / noise);
+            metrics[0][s] = (2.0 * p0 / (p1 + p0)).log2() - bias;
+            metrics[1][s] = (2.0 * p1 / (p1 + p0)).log2() - bias;
+        }
+
+        {
+            let p1 = 1.0 - normal(((255.0 - OFFSET - 0.5) / amp - 1.0) / noise);
+            let p0 = 1.0 - normal(((255.0 - OFFSET - 0.5) / amp + 1.0) / noise);
+            metrics[0][255] = (2.0 * p0 / (p1 + p0)).log2() - bias;
+            metrics[1][255] = (2.0 * p1 / (p1 + p0)).log2() - bias;
+        }
+
+        for (i, bit) in metrics.iter().enumerate() {
+            for (j, s) in bit.iter().enumerate() {
+                self.metrics[i][j] = match (s * scale + 0.5).floor() {
+                    x if x.is_nan() => i32::MIN,
+                    f64::NEG_INFINITY => i32::MIN,
+                    other => other as i32,
+                };
+            }
+        }
+    }
+
     // initialize symbol mapping
     fn vd_init(&mut self) {
         // syms[i] = combined symbol (4 bits -> index into mets)
@@ -182,7 +232,7 @@ impl Viterbi {
 
         // branch metrics mapping: metrics[tx][rx]
         // mapping from bits (tx) and received bit (0/1)
-        let metrics: [[i32; 2]; 2] = [[3, -7], [-7, 3]];
+        let metrics: [[i32; 3]; 2] = [[3, 0, -7], [-7, 0, 3]];
 
         // main decode loop over NBITS symbols
         let mut bitcnt_isize: isize = -((K as isize) - 1); // replicates original init
@@ -195,10 +245,19 @@ impl Viterbi {
                 // build from MSB to LSB to match original
                 for j in 0..N {
                     let bindex = symbol_offset + j;
-                    // let bit = bits[bindex] != 0;
-                    let bit = bits[bindex] == truth;
+
                     let bit_idx = (i >> (N - j - 1)) & 1;
-                    acc += metrics[bit_idx][if bit { 1 } else { 0 }];
+
+                    // let bit = bits[bindex] != 0;
+                    let met_idx: usize = if truth == 129 {
+                        bits[bindex] as usize - 127
+                    }
+                    else {
+                        let bit = bits[bindex] == truth;
+                        if bit { 2 } else { 0 }
+                    };
+
+                    acc += metrics[bit_idx][met_idx];
                 }
                 *met = acc;
             }
@@ -378,7 +437,7 @@ mod tests {
             encoded.resize(3096, 0);
         }
 
-        let decoded = v.viterbi(&encoded);
+        let decoded = v.viterbi(&encoded, 1);
         assert_eq!(decoded.len(), 768);
 
         // With perfect channel and all-zero input, decoder should yield all zeros
@@ -391,7 +450,7 @@ mod tests {
         let mut rng = rand::rng();
         let v = new_viterbi();
         let bits: Vec<u8> = (0..3096).map(|_| rng.random::<u8>() % 2).collect();
-        let decoded = v.viterbi(&bits);
+        let decoded = v.viterbi(&bits, 1);
         assert_eq!(decoded.len(), 768);
     }
 }
