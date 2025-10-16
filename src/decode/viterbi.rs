@@ -34,9 +34,6 @@ pub fn new_viterbi() -> Viterbi {
     v.gen_table49();
     v.vd_init();
 
-    // v.gen_metrics();
-    // dbg!(&v.metrics);
-
     v
 }
 
@@ -86,49 +83,6 @@ impl Bit {
 }
 
 impl Viterbi {
-
-    fn gen_metrics(&mut self) {
-        let OFFSET: f64 = 128.0;
-        let amp: f64 = 1.0;
-        let noise: f64 = 1.0;
-        let bias: f64 = 0.0;
-        let scale: f64 = 4.0;
-
-        let mut metrics: [[f64; 256]; 2] = [[0.0; 256]; 2];
-
-        {
-            let p1 = normal(((0.0 - OFFSET + 0.5) / amp - 1.0) / noise);
-            let p0 = normal(((0.0 - OFFSET + 0.5) / amp + 1.0) / noise);
-            metrics[0][0] = (2.0 * p0 / (p1 + p0)).log2() - bias;
-            metrics[1][0] = (2.0 * p1 / (p1 + p0)).log2() - bias;
-        }
-
-        for s in 1..255 {
-            let p1 = normal(((s as f64 - OFFSET + 0.5) / amp - 1.0) / noise)
-                - normal(((s as f64 - OFFSET - 0.5) / amp - 1.0) / noise);
-            let p0 = normal(((s as f64 - OFFSET + 0.5) / amp + 1.0) / noise)
-                - normal(((s as f64 - OFFSET - 0.5) / amp + 1.0) / noise);
-            metrics[0][s] = (2.0 * p0 / (p1 + p0)).log2() - bias;
-            metrics[1][s] = (2.0 * p1 / (p1 + p0)).log2() - bias;
-        }
-
-        {
-            let p1 = 1.0 - normal(((255.0 - OFFSET - 0.5) / amp - 1.0) / noise);
-            let p0 = 1.0 - normal(((255.0 - OFFSET - 0.5) / amp + 1.0) / noise);
-            metrics[0][255] = (2.0 * p0 / (p1 + p0)).log2() - bias;
-            metrics[1][255] = (2.0 * p1 / (p1 + p0)).log2() - bias;
-        }
-
-        for (i, bit) in metrics.iter().enumerate() {
-            for (j, s) in bit.iter().enumerate() {
-                self.metrics[i][j] = match (s * scale + 0.5).floor() {
-                    x if x.is_nan() => i32::MIN,
-                    f64::NEG_INFINITY => i32::MIN,
-                    other => other as i32,
-                };
-            }
-        }
-    }
 
     // initialize symbol mapping
     fn vd_init(&mut self) {
@@ -211,122 +165,6 @@ impl Viterbi {
 
         out
     }
-
-    pub fn real_viterbi(&self, bits: &[Bit]) -> Vec<u8> {
-        let nbits = bits.len() / N - (K - 1);
-        let mut result = vec![0u8; nbits];
-
-        let mut bitcnt = -(K as i32 - 1);
-
-        let mut m0: i32;
-        let mut m1: i32;
-
-        let mut mets: [i32; 1 << N] = [0; 1 << N];
-
-        let path_len = ((nbits + K - 1) * D) as usize;
-        let mut paths = vec![0u32; path_len];
-
-        let mut cmetric: [i32; 1 << (K - 1)] = [0i32; 1 << (K - 1)];
-        let mut nmetric: [i32; 1 << (K - 1)] = [0i32; 1 << (K - 1)];
-
-        let mut mask: u32 = 1;
-
-        let mut startstate: usize = 0;
-        let mut endstate: usize = 0;
-
-        startstate &= !((1 << (K - 1)) - 1);
-        endstate &= !((1 << (K - 1)) - 1);
-
-        /* Initialize starting metrics */
-        for c in cmetric.iter_mut().take(1 << (K - 1)) {
-            *c = -999999;
-        }
-        cmetric[startstate] = 0;
-
-        let mut path_offset: usize = 0;
-        let mut symbol_offset: usize = 0;
-
-        // let metrics = [[3, -7], [-7, 3]];
-        let metrics: [[i32; 3]; 2] = [[3, 0, -7], [-7, 0, 3]];
-
-        loop {
-            /* For each data bit */
-            /* Read input symbols and compute branch metrics */
-            for (i, met) in mets.iter_mut().enumerate().take(1 << N) {
-                *met = 0;
-                for j in 0..N as usize {
-
-                    let bindex = symbol_offset + j;
-                    let bit_idx = (i >> (N - j - 1)) & 1;
-                    *met += metrics[bit_idx][bits[bindex] as usize];
-
-
-                    // *met += metrics[(i >> (N as usize - j - 1)) & 1]
-                    //     [if bits[symbol_offset + j] { 1 } else { 0 }];
-                }
-            }
-
-            symbol_offset += N as usize;
-
-            /* Run the add-compare-select operations */
-            let mut i = 0;
-            loop {
-                let mut b1 = mets[self.syms[i]];
-                nmetric[i] = cmetric[i / 2] + b1;
-                m0 = cmetric[i / 2] + b1;
-                let b2 = mets[self.syms[i + 1]];
-                b1 -= b2;
-                m1 = cmetric[(i / 2) + (1 << (K - 2))] + b2;
-                if m1 > m0 {
-                    nmetric[i] = m1;
-                    paths[path_offset] |= mask;
-                }
-                m0 -= b1;
-                nmetric[i + 1] = m0;
-                m1 += b1;
-                if m1 > m0 {
-                    nmetric[i + 1] = m1;
-                    paths[path_offset] |= mask << 1;
-                }
-                mask <<= 2;
-                if mask == 0 {
-                    mask = 1;
-                    path_offset += 1;
-                }
-
-                i += 2;
-                if i >= (1 << (K - 1)) {
-                    break;
-                }
-            }
-
-            if mask != 1 {
-                path_offset += 1;
-            }
-            bitcnt += 1;
-            if bitcnt == nbits as i32 {
-                break;
-            }
-            cmetric.copy_from_slice(&nmetric);
-        }
-
-        /* Chain back from terminal state to produce decoded data */
-        for i in (0..(nbits as usize)).rev() {
-            path_offset -= D as usize;
-
-            if (paths[path_offset + (endstate >> LOGLONGBITS)]
-                & (1u32 << (endstate & (LONGBITS as usize - 1))))
-                != 0
-            {
-                endstate |= 1 << (K - 1);
-                result[i] = 1;
-            }
-            endstate >>= 1;
-        }
-
-        result
-    }
-
 
     /// Viterbi decoder core.
     pub fn viterbi(&self, bits: &[Bit]) -> Vec<u8> {
@@ -558,7 +396,7 @@ mod tests {
             encoded.resize(3096, 0);
         }
 
-        let decoded = v.viterbi(&encoded, 1);
+        let decoded = v.viterbi(&encoded);
         assert_eq!(decoded.len(), 768);
 
         // With perfect channel and all-zero input, decoder should yield all zeros
