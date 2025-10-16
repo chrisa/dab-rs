@@ -1,8 +1,7 @@
-use bitvec::mem::bits_of;
 use libm::floor;
 
 use crate::{
-    decode::{bit_reverse, bits_to_bytes, bytes_to_bits, qpsk_symbol_demapper, scramble, Viterbi},
+    decode::{bit_reverse, bits_to_bytes, bytes_to_bits, qpsk_symbol_demapper, scramble, Viterbi, Bit},
     fic::ensemble::{Protection, SubChannel, SubChannelType},
     msc::{tables::PVEC, Buffers, ChannelSymbols, MainServiceChannelBuffer, SizedBuffer},
     new_viterbi,
@@ -62,7 +61,7 @@ impl MainServiceChannelDecoder {
         use pretty_hex::*;
         // println!("{}", pretty_hex(&depunctured));
 
-        let vited = self.viterbi.viterbi(&depunctured, 129);
+        let vited = self.viterbi.viterbi(&depunctured);
         // println!("{}", pretty_hex(&vited));
         let scrambled = scramble(&vited);
         // println!("{}", pretty_hex(&scrambled));
@@ -126,7 +125,7 @@ impl MainServiceChannelDecoder {
         result
     }
 
-    fn eep_depuncture(&self, bits: &Vec<u8>, sc: &dyn SubChannel) -> Vec<u8> {
+    fn eep_depuncture(&self, bits: &Vec<u8>, sc: &dyn SubChannel) -> Vec<Bit> {
         // println!("eep got bits of len {}", bits.len());
         Vec::new()
     }
@@ -151,13 +150,11 @@ impl MainServiceChannelDecoder {
     //             *(obuf + k++) = OFFSET - 1 + (*(inbuf + j++) << 1);
     //         else
     //             *(obuf + k++) = OFFSET;
-    //     *len = k;
+//     *len = k;
     //     return 0;
     // }
 
-    fn uep_depuncture(&self, bits: &Vec<u8>, sc: &dyn SubChannel) -> Vec<u8> {
-        // Viterbi symbol values 0->127 1->129 erasure->128
-        const OFFSET: u8 = 128;
+    fn uep_depuncture(&self, bits: &Vec<u8>, sc: &dyn SubChannel) -> Vec<Bit> {
         const BLKSIZE: usize = 128;
 
         // println!("uep got bits of len {}", bits.len());
@@ -169,7 +166,7 @@ impl MainServiceChannelDecoder {
 
         // dbg!(uep);
 
-        let mut result: Vec<u8> = Vec::with_capacity(4 * bits.len());
+        let mut result: Vec<Bit> = Vec::with_capacity(4 * bits.len());
 
         let mut iter = bits.iter();
 
@@ -178,18 +175,18 @@ impl MainServiceChannelDecoder {
             for i in 0..(BLKSIZE * uep.l[indx]) {
                 // println!("i: {}", i);
                 if PVEC[uep.pi[indx]][i % 32] == 1 {
-                    result.push(OFFSET - 1 + (iter.next().unwrap() << 1))
+                    result.push(Bit::from_u8(iter.next().unwrap()));
                 } else {
-                    result.push(OFFSET);
+                    result.push(Bit::Erased);
                 }
             }
         }
 
         for i in 0..24 {
             if PVEC[7][i % 32] == 1 {
-                result.push(OFFSET - 1 + (iter.next().unwrap() << 1))
+                result.push(Bit::from_u8(iter.next().unwrap()));
             } else {
-                result.push(OFFSET);
+                result.push(Bit::Erased);
             }
         }
 
@@ -198,7 +195,7 @@ impl MainServiceChannelDecoder {
         result
     }
 
-    fn eep_depuncture_data(&self, bits: &Vec<u8>, sc: &dyn SubChannel) -> Vec<u8> {
+    fn eep_depuncture_data(&self, bits: &Vec<u8>, sc: &dyn SubChannel) -> Vec<Bit> {
         // println!("eep data got bits of len {}", bits.len());
         Vec::new()
     }

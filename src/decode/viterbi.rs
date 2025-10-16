@@ -68,6 +68,23 @@ const PARTAB: [u8; 256] = [
 
 const POLYS: [usize; 4] = [0x6d, 0x4f, 0x53, 0x6d]; /* k = 7; DAB */
 
+#[derive(Debug, Copy, Clone)]
+pub enum Bit {
+    False = 0,
+    Erased = 1,
+    True = 2,
+}
+
+impl Bit {
+    pub fn from_u8(bit: &u8) -> Bit {
+        match bit {
+            0 => Bit::False,
+            1 => Bit::True,
+            u => { panic!("unexpected bit value: {}", u) },
+        }
+    }
+}
+
 impl Viterbi {
 
     fn gen_metrics(&mut self) {
@@ -196,17 +213,16 @@ impl Viterbi {
     }
 
     /// Viterbi decoder core.
-    /// Bits expected to be 0/1
-    pub fn viterbi(&self, bits: &[u8], truth: u8) -> Vec<u8> {
-        let NBITS = bits.len() / N - (K - 1);
+    pub fn viterbi(&self, bits: &[Bit]) -> Vec<u8> {
+        let nbits = bits.len() / N - (K - 1);
 
         // output
-        let mut result = vec![0u8; NBITS];
+        let mut result = vec![0u8; nbits];
 
         // work arrays
         let mut mets = [0i32; METS_SZ];
         // path storage (each entry stores 32 decisions packed into u32 words)
-        let paths_len = (NBITS + K - 1) * D;
+        let paths_len = (nbits + K - 1) * D;
         let mut paths = vec![0u32; paths_len];
 
         let mut cmetric = vec![i32::MIN / 4; STATES]; // large negative initial (safe margin)
@@ -245,19 +261,8 @@ impl Viterbi {
                 // build from MSB to LSB to match original
                 for j in 0..N {
                     let bindex = symbol_offset + j;
-
                     let bit_idx = (i >> (N - j - 1)) & 1;
-
-                    // let bit = bits[bindex] != 0;
-                    let met_idx: usize = if truth == 129 {
-                        bits[bindex] as usize - 127
-                    }
-                    else {
-                        let bit = bits[bindex] == truth;
-                        if bit { 2 } else { 0 }
-                    };
-
-                    acc += metrics[bit_idx][met_idx];
+                    acc += metrics[bit_idx][bits[bindex] as usize];
                 }
                 *met = acc;
             }
@@ -319,7 +324,7 @@ impl Viterbi {
             }
 
             bitcnt_isize += 1;
-            if bitcnt_isize == NBITS as isize {
+            if bitcnt_isize == nbits as isize {
                 break;
             }
 
@@ -331,7 +336,7 @@ impl Viterbi {
         // original used (endstate >> LOGLONGBITS) indexing into path words and bit-check on
         // (1u32 << (endstate & (LONGBITS - 1)))
         // replicate that logic safely
-        for i in (0..NBITS).rev() {
+        for i in (0..nbits).rev() {
             // step back path_offset by D
             path_offset -= D;
 
@@ -450,7 +455,7 @@ mod tests {
         let mut rng = rand::rng();
         let v = new_viterbi();
         let bits: Vec<u8> = (0..3096).map(|_| rng.random::<u8>() % 2).collect();
-        let decoded = v.viterbi(&bits, 1);
+        let decoded = v.viterbi(&bits);
         assert_eq!(decoded.len(), 768);
     }
 }

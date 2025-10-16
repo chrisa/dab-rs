@@ -1,7 +1,7 @@
 mod viterbi;
 
 use itertools::Itertools;
-pub use viterbi::Viterbi;
+pub use viterbi::{Viterbi, Bit};
 pub use viterbi::new_viterbi;
 
 const K: i32 = 1536;
@@ -50,20 +50,20 @@ pub fn qpsk_symbol_demapper(bits: &[u8]) -> Vec<u8> {
     slice
 }
 
-pub fn depuncture(bits: &[u8; 2304]) -> Vec<u8> {
+pub fn depuncture(bits: &[u8; 2304]) -> Vec<Bit> {
     // 21 blocks, using puncture 1110 1110 1110 1110 1110 1110 1110 1110
     //  3 blocks, using puncture 1110 1110 1110 1110 1110 1110 1110 1100
     // 24 bits,   using puncture 1100 1100 1100 1100 1100 1100
     let mut i: usize = 0;
     let mut k: usize = 0;
-    let mut result: Vec<u8> = vec![0; 3096];
+    let mut result: Vec<Bit> = vec![Bit::Erased; 3096];
 
     loop {
         for j in 0..8 {
-            result[i + j * 4] = bits[k];
-            result[i + j * 4 + 1] = bits[k + 1];
-            result[i + j * 4 + 2] = bits[k + 2];
-            result[i + j * 4 + 3] = 0; // mark depunctured bit for soft decision
+            result[i + j * 4] = Bit::from_u8(&bits[k]);
+            result[i + j * 4 + 1] = Bit::from_u8(&bits[k + 1]);
+            result[i + j * 4 + 2] = Bit::from_u8(&bits[k + 2]);
+            result[i + j * 4 + 3] = Bit::Erased; // mark depunctured bit for soft decision
             k += 3;
         }
 
@@ -76,18 +76,18 @@ pub fn depuncture(bits: &[u8; 2304]) -> Vec<u8> {
     let mut i = 21 * 128;
     loop {
         for j in 0..7 {
-            result[i + j * 4] = bits[k];
-            result[i + j * 4 + 1] = bits[k + 1];
-            result[i + j * 4 + 2] = bits[k + 2];
-            result[i + j * 4 + 3] = 0;
+            result[i + j * 4] = Bit::from_u8(&bits[k]);
+            result[i + j * 4 + 1] = Bit::from_u8(&bits[k + 1]);
+            result[i + j * 4 + 2] = Bit::from_u8(&bits[k + 2]);
+            result[i + j * 4 + 3] = Bit::Erased;
             k += 3;
         }
 
         let j = 7; // value of j after the loop above (!)
-        result[i + j * 4] = bits[k];
-        result[i + j * 4 + 1] = bits[k + 1];
-        result[i + j * 4 + 2] = 0;
-        result[i + j * 4 + 3] = 0;
+        result[i + j * 4] = Bit::from_u8(&bits[k]);
+        result[i + j * 4 + 1] = Bit::from_u8(&bits[k + 1]);
+        result[i + j * 4 + 2] = Bit::Erased;
+        result[i + j * 4 + 3] = Bit::Erased;
         k += 2;
 
         i += 32;
@@ -97,10 +97,10 @@ pub fn depuncture(bits: &[u8; 2304]) -> Vec<u8> {
     }
 
     for j in 0..6 {
-        result[i + j * 4] = bits[k];
-        result[i + j * 4 + 1] = bits[k + 1];
-        result[i + j * 4 + 2] = 0;
-        result[i + j * 4 + 3] = 0;
+        result[i + j * 4] = Bit::from_u8(&bits[k]);
+        result[i + j * 4 + 1] = Bit::from_u8(&bits[k + 1]);
+        result[i + j * 4 + 2] = Bit::Erased;
+        result[i + j * 4 + 3] = Bit::Erased;
         k += 2;
     }
 

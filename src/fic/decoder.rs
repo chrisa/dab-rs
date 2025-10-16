@@ -115,7 +115,7 @@ impl FastInformationChannelDecoder {
         for i in 0..4 {
             split.copy_from_slice(&merged[(i * 2304)..((i + 1) * 2304)]);
             let depunctured = depuncture(&split);
-            let viterbied = self.viterbi.viterbi(&depunctured, 1);
+            let viterbied = self.viterbi.viterbi(&depunctured);
             let scrambled = scramble(&viterbied);
             // Split into FIBs
             for j in 0..3 {
