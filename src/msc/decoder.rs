@@ -111,7 +111,7 @@ impl MainServiceChannelDecoder {
             // println!("i: {} offset: {} n: {} m: {}", i, offset, n, m);
             // dbg!(&buffers.symbols);
 
-            if let Some(buf) = buffers.symbols[cif][n] {
+            if let Some(buf) = buffers.symbols[(buffers.lframe + cif) % 16][n] {
                 // println!("{}", pretty_hex(&buf.bits));
                 let bit = buf.bits[m];
                 result.push(bit);

@@ -128,7 +128,7 @@ impl<'a> DABReceiver<'a> {
             if let Some(main) = channel.try_buffer(&buffer) {
                 // dbg!(&main);
                 pad.output(&main);
-                // mpeg.output(&main);
+                mpeg.output(&main);
             }
         }
     }

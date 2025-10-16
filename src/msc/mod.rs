@@ -24,6 +24,7 @@ enum SizedBuffer {
 }
 
 pub struct Buffers<const N: usize> {
+    head: usize,
     sym: usize,
     lframe: usize,
     full: bool,
@@ -67,6 +68,7 @@ impl<const N: usize> BufferOps for Buffers<{ N }> {
         self.symbols[self.lframe][self.sym] = Some(*buffer);
         self.sym = (self.sym + 1) % N;
         if self.sym == 0 {
+            // self.head += 1;
             self.lframe = (self.lframe + 1) % 16;
             if self.lframe == 0 {
                 self.full = true;
@@ -130,17 +132,20 @@ pub fn new_channel(service: &Service) -> MainServiceChannel<'_> {
     let buffers = match symbols.count {
         1 => SizedBuffer::One(Buffers::<1> {
             symbols: [[None; 1]; 16],
+            head: 0,
             sym: 0,
             lframe: 0,
             full: false,
         }),
         2 => SizedBuffer::Two(Buffers::<2> {
+            head: 0,
             symbols: [[None; 2]; 16],
             sym: 0,
             lframe: 0,
             full: false,
         }),
         3 => SizedBuffer::Three(Buffers::<3> {
+            head: 0,
             symbols: [[None; 3]; 16],
             sym: 0,
             lframe: 0,
