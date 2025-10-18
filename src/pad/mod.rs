@@ -6,6 +6,16 @@ use bitvec::prelude::*;
 
 use crate::msc::MainServiceChannelFrame;
 
+
+pub struct Label {
+    pub label: String,
+    pub is_new: bool,
+}
+
+pub struct Error {
+
+}
+
 #[derive(Debug, Clone)]
 pub struct PadState {
     bitrate: i32,
@@ -15,11 +25,13 @@ pub struct PadState {
     left: u8,
     ci: u8,
     toggle: bool,
-    first: u8,
+    firstlast: FirstLast,
     label: [u8; 128],
+    offset: usize,
     crc: [u8; 2],
-    segment: [u8; 20],
+    segment: [u8; 18],
     ptr_index: usize,
+    is_new: bool,
 }
 
 pub fn new_padstate() -> PadState {
@@ -31,11 +43,13 @@ pub fn new_padstate() -> PadState {
         left: 0,
         ci: 0,
         toggle: false,
-        first: 0,
+        firstlast: FirstLast::First,
         label: [0; 128],
+        offset: 0,
         crc: [0; 2],
-        segment: [0; 20],
+        segment: [0; 18],
         ptr_index: 0,
+        is_new: true, // assume first DLS label received is new
     }
 }
 
@@ -90,7 +104,7 @@ struct DlsPad {
     f2: u8,
     f1: u8,
     cmd: bool,
-    first: u8,
+    firstlast: FirstLast,
     toggle: bool,
 }
 
@@ -102,8 +116,28 @@ impl DlsPad {
             f2: bits[4..8].load_be(),
             f1: bits[8..12].load_be(),
             cmd: bits[12],
-            first: bits[13..14].load_be(),
+            firstlast: FirstLast::from_u8(bits[13..14].load_be()),
             toggle: bits[15],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum FirstLast {
+    Intermediate = 0,
+    Last = 1,
+    First = 2,
+    OneAndOnly = 3,
+}
+
+impl FirstLast {
+    pub fn from_u8(bits: u8) -> Self {
+        match bits {
+            0 => Self::Intermediate,
+            1 => Self::Last,
+            2 => Self::First,
+            3 => Self::OneAndOnly,
+            u => panic!("unexpected FirstLast: {}", u),
         }
     }
 }
@@ -113,11 +147,11 @@ impl PadState {
         &mut self.segment[self.ptr_index]
     }
 
-    pub fn output(&mut self, frame: &MainServiceChannelFrame) {
+    pub fn output(&mut self, frame: &MainServiceChannelFrame) -> Result<Label, Error> {
         let buf = &frame.bits;
         let bytes = buf.len();
         if bytes < 2 {
-            return;
+            return Err(Error{});
         }
 
         let scf_words = if self.sampling_freq == 48 {
@@ -142,7 +176,7 @@ impl PadState {
             if p00.XPadInd == 1 {
                 let xpadoff = bytes as i32 - (1 + scf_words + 2);
                 if xpadoff < 0 {
-                    return;
+                    return Err(Error{})
                 }
 
                 let xpadoff = xpadoff as usize;
@@ -155,13 +189,14 @@ impl PadState {
                         let prefix = u16::from_be_bytes([buf[xpadoff - 1], buf[xpadoff]]);
                         let dls = DlsPad::from_u16(prefix);
 
+                        if dls.toggle != self.toggle {
+                            self.toggle = dls.toggle;
+                            self.is_new = true;
+                        }
+
                         // dbg!(&dls);
 
-                        if dls.first == 2 {
-                            if dls.toggle != self.toggle {
-                                self.toggle = dls.toggle;
-                                let _ = writeln!(io::stderr(), "\nnew DLS:");
-                            }
+                        if dls.firstlast == FirstLast::First {
                             self.ptr_index = 0;
                             self.dls_length = 0;
                         }
@@ -177,7 +212,7 @@ impl PadState {
                         self.left = dls.f1 + 2;
                         self.seglen = self.left + 1;
                         self.dls_length += dls.f1 + 1;
-                        self.first = dls.first;
+                        self.firstlast = dls.firstlast;
                     }
                 } else if self.ci == 2 {
                     for i in 0..4 {
@@ -199,27 +234,46 @@ impl PadState {
                     }
 
                     if self.left == 0 {
-                        // crc16check(&self.segment, self.seglen);
 
-                        if (self.seglen as usize) < self.segment.len() {
-                            self.segment[self.seglen as usize] = 0;
+                        // eprintln!("segment: {} seglen: {} firstlast: {:?}", String::from_utf8_lossy(&self.segment[2..]), self.seglen, self.firstlast);
+                        match self.firstlast {
+                            FirstLast::First => {
+                                self.label = [0; 128];
+                                self.offset = self.seglen as usize - 2;
+                                self.label[0..self.offset].copy_from_slice(&self.segment[2..self.seglen as usize]);
+                                return Err(Error{});
+                            },
+                            FirstLast::Intermediate => {
+                                self.label[self.offset..(self.offset+self.seglen as usize - 2)].copy_from_slice(&self.segment[2..self.seglen as usize]);
+                                self.offset += self.seglen as usize - 2;
+                                return Err(Error{});
+                            },
+                            FirstLast::Last => {
+                                self.label[self.offset..(self.offset+self.seglen as usize - 2)].copy_from_slice(&self.segment[2..self.seglen as usize]);
+                                self.offset += self.seglen as usize - 2;
+                                let label = Label { label: String::from_utf8_lossy(&self.label[0..self.offset]).to_string(), is_new: self.is_new };
+                                // reset here, in case there is no First next time
+                                self.label = [0; 128];
+                                self.offset = 0;
+                                self.is_new = false;
+                                return Ok(label);
+                            },
+                            FirstLast::OneAndOnly => {
+                                self.label = [0; 128];
+                                self.offset = self.seglen as usize - 2;
+                                self.label[0..self.offset].copy_from_slice(&self.segment[2..self.seglen as usize]);
+                                let label = Label { label: String::from_utf8_lossy(&self.label[0..self.offset]).to_string(), is_new: self.is_new };
+                                // reset here, in case there is no First next time
+                                self.label = [0; 128];
+                                self.offset = 0;
+                                self.is_new = false;
+                                return Ok(label);
+                            }
                         }
-
-                        eprintln!("segment: {}", String::from_utf8_lossy(&self.segment[2..]));
-
-                        // let label_offset = (self.dls_length - (self.seglen - 2)) as usize;
-                        // let copy_len = cmp::min((self.seglen - 2) as usize, self.label.len() - label_offset);
-                        // self.label[label_offset..label_offset + copy_len]
-                        //     .copy_from_slice(&self.segment[2..2 + copy_len]);
-
-                        // if self.first == 1 {
-                        //     self.label[self.dls_length as usize] = 0;
-                        //     let text = String::from_utf8_lossy(&self.label[..self.dls_length as usize]);
-                        //     let _ = writeln!(io::stderr(), "DLS: {}", text);
-                        // }
                     }
                 }
             }
         }
+        Err(Error{})
     }
 }
