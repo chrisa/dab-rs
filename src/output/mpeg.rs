@@ -2,15 +2,10 @@ use crate::{msc::MainServiceChannelFrame, output::mp2header::Mp2Header};
 use alsa::pcm::{Access, Format, HwParams, PCM};
 use alsa::{Direction, ValueOr};
 
-use std::io::Cursor;
 use symphonia::core::audio::{AudioBuffer, AudioBufferRef, Signal};
 use symphonia::core::codecs::{CODEC_TYPE_MP2, Decoder, DecoderOptions};
-use symphonia::core::errors::Error;
 use symphonia::core::formats::Packet;
-use symphonia::core::formats::{FormatOptions, FormatReader};
-use symphonia::core::io::MediaSourceStream;
-use symphonia::core::meta::MetadataOptions;
-use symphonia::default::{get_codecs, get_probe};
+use symphonia::default::get_codecs;
 
 /* Tables 20 and 21 ETSI EN 300 401 V1.3.3 (2001-05), 7.2.1.3, P.69-70
 Entries of -1 in these tables correspond to forbidden indices */
@@ -92,7 +87,7 @@ impl Mpeg {
             if ((header_int & HMASK) ^ HXOR) != 0 {
                 eprintln!("header mask check failed: {:x}", header_int);
                 self.header_valid = false;
-            } else if header.id == false {
+            } else if !header.id {
                 self.header_expected = false;
                 if LBRTAB[header.bit_rate_index as usize] != frame.bitrate as i16 {
                     eprintln!(
@@ -135,7 +130,6 @@ impl Mpeg {
                 Err(e) => {
                     eprintln!("Frame decode error: {:?}", e);
                     // Continue on decode errors (or break depending on your use case).
-                    return;
                 }
             }
         }

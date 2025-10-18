@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 
 use itertools::Itertools;
-use std::any::Any;
 use std::sync::atomic::Ordering::Relaxed;
 use std::{collections::HashMap, sync::atomic::AtomicU64};
 
@@ -92,6 +91,7 @@ pub fn new_subchannel(id: u8, primary: bool) -> AudioSubChannel {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn new_data_subchannel(id: u16, primary: bool) -> DataSubChannel {
     DataSubChannel {
         id,
@@ -187,7 +187,6 @@ impl Ensemble {
         let tries = self.increment_tries();
         let empty = self.services.is_empty();
         let service_labels = self.services_labelled();
-        // let contiguous = self.subchannels_contiguous();
         let ensemble_label = self.ensemble_labelled();
         tries > 100 || (!empty && service_labels && ensemble_label)
     }
@@ -223,32 +222,6 @@ impl Ensemble {
 
     fn ensemble_labelled(&self) -> bool {
         self.name != "Unknown"
-    }
-
-    fn subchannels_contiguous(&self) -> bool {
-        let subchannels = self
-            .services
-            .values()
-            .flat_map(|s| s.audio_subchannels.values())
-            .map(|sc| (sc.start, sc.size));
-
-        let data_subchannels = self
-            .services
-            .values()
-            .flat_map(|s| s.data_subchannels.values())
-            .map(|dsc| (dsc.start, dsc.size));
-
-        let all = subchannels.chain(data_subchannels);
-
-        !all.sorted_by(|a, b| Ord::cmp(&a.0, &b.0))
-            .scan(0u16, |state, sc| {
-                if sc.0 != *state {
-                    return Some(u16::MAX);
-                }
-                *state += if sc.1 == 0 { 1 } else { sc.1 };
-                Some(sc.0)
-            })
-            .any(|start| start == u16::MAX)
     }
 
     pub fn display(&self) {
@@ -435,6 +408,7 @@ impl Ensemble {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn set_service_subchannel_info(
         &mut self,
         service_id: u32,
@@ -471,6 +445,7 @@ impl Ensemble {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn set_service_data_subchannel_info(
         &mut self,
         service_id: u32,

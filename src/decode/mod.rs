@@ -29,7 +29,7 @@ pub fn bits_to_bytes(bits: &[u8]) -> Vec<u8> {
     assert!(bits.len().is_multiple_of(8));
     let mut bytes = Vec::with_capacity(bits.len() / 8);
 
-    for mut chunk in &bits.into_iter().chunks(8) {
+    for mut chunk in &bits.iter().chunks(8) {
         bytes.push(
             (chunk.next().unwrap()<<7) + (chunk.next().unwrap()<<6) + (chunk.next().unwrap()<<5) + (chunk.next().unwrap()<<4) + //be
             (chunk.next().unwrap()<<3) + (chunk.next().unwrap()<<2) + (chunk.next().unwrap()<<1) +  chunk.next().unwrap()

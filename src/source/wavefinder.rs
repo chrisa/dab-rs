@@ -38,7 +38,6 @@ pub fn new_wavefinder_source(
 }
 
 impl Source for WavefinderSource {
-
     fn ready(&self) -> bool {
         if let Some(sync) = &self.sync
             && let Ok(s) = sync.lock()

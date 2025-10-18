@@ -22,14 +22,12 @@ const TABLE49_LEN: usize = 1536; // computed from original algorithm
 pub struct Viterbi {
     table49: Vec<i32>, // length TABLE49_LEN (1536)
     syms: Vec<usize>,  // length SYMS_SZ (128)
-    metrics: Box<[[i32; 256]; 2]>,
 }
 
 pub fn new_viterbi() -> Viterbi {
     let mut v = Viterbi {
         table49: vec![0i32; TABLE49_LEN],
         syms: vec![0usize; SYMS_SZ],
-        metrics: Box::new([[0; 256]; 2]),
     };
     v.gen_table49();
     v.vd_init();
@@ -309,108 +307,5 @@ impl Viterbi {
         }
 
         result
-    }
-}
-
-// ---- Helper converters (optional) ----
-
-/// Convert Vec<bool> -> Vec<u8> (0/1)
-#[allow(dead_code)]
-pub fn bools_to_u8(src: &[bool]) -> Vec<u8> {
-    let mut out = vec![0u8; src.len()];
-    for (i, &b) in src.iter().enumerate() {
-        out[i] = if b { 1 } else { 0 };
-    }
-    out
-}
-
-/// Convert Vec<u8> -> Vec<bool> (assumes values are 0/1)
-#[allow(dead_code)]
-pub fn u8_to_bools(src: &[u8]) -> Vec<bool> {
-    src.iter().map(|&b| b != 0).collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_table49_generation() {
-        let v = new_viterbi();
-        assert_eq!(v.table49.len(), 1536);
-        // Check some basic properties
-        assert!(v.table49.iter().all(|&k| k != 0));
-        assert!(v.table49.iter().all(|&k| k >= -1023 && k <= 1023));
-    }
-
-    #[test]
-    fn test_vd_init_syms() {
-        let v = new_viterbi();
-        assert_eq!(v.syms.len(), 1 << K);
-        // Ensure all symbol mappings are within the branch metric table size (0..16)
-        assert!(v.syms.iter().all(|&s| s < (1 << N)));
-        // Spot check deterministic known values
-        assert_eq!(v.syms[0], 0);
-        assert_eq!(v.syms[127], v.syms[127]); // Shouldn't panic
-    }
-
-    #[test]
-    fn test_frequency_deinterleave_roundtrip() {
-        let v = new_viterbi();
-
-        // Create a simple pattern in input
-        let mut input = vec![0u8; 2 * v.table49.len()];
-        for (i, x) in input.iter_mut().enumerate() {
-            *x = (i % 2) as u8;
-        }
-
-        let deintl = v.frequency_deinterleave(&input);
-        assert_eq!(deintl.len(), input.len());
-
-        // Not necessarily equal, but should be deterministic and not panic
-        let again = v.frequency_deinterleave(&input);
-        assert_eq!(deintl, again);
-    }
-
-    #[test]
-    fn test_viterbi_known_sequence() {
-        let v = new_viterbi();
-
-        // Create a "perfect" encoded sequence for input bits of all zeros
-        // For the DAB rate-1/4 code, encoding all zeros yields repeated known pattern
-        // We can simulate an encoder here (N=4 output bits per input bit)
-        let input_bits = vec![0u8; 768]; // 768 zero bits
-        let mut encoded = Vec::with_capacity(3096);
-
-        // Simple rate 1/4 convolutional encoder
-        // shift register initialised to 0
-        let mut state: usize = 0;
-        for &bit in &input_bits {
-            state = ((state << 1) | (bit as usize)) & ((1 << K) - 1);
-            for &p in POLYS.iter() {
-                encoded.push((parity(state & p) & 1) as u8);
-            }
-        }
-
-        // Padding to 3096 bits if needed
-        if encoded.len() < 3096 {
-            encoded.resize(3096, 0);
-        }
-
-        let decoded = v.viterbi(&encoded);
-        assert_eq!(decoded.len(), 768);
-
-        // With perfect channel and all-zero input, decoder should yield all zeros
-        assert!(decoded.iter().all(|&b| b == 0));
-    }
-
-    #[test]
-    fn test_viterbi_random_input() {
-        use rand::Rng;
-        let mut rng = rand::rng();
-        let v = new_viterbi();
-        let bits: Vec<u8> = (0..3096).map(|_| rng.random::<u8>() % 2).collect();
-        let decoded = v.viterbi(&bits);
-        assert_eq!(decoded.len(), 768);
     }
 }

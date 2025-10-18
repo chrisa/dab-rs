@@ -7,11 +7,9 @@
 #![allow(clippy::too_many_arguments)]
 
 use std::sync::mpsc::{self, Receiver};
-use std::thread;
-use std::time::Duration;
 
 use clap::Parser;
-use dab::output::mpeg::{self, Mpeg};
+use dab::output::mpeg::{self};
 use dab::pad;
 use dab::source::Source;
 use dab::wavefinder::Buffer;
@@ -128,7 +126,7 @@ impl<'a> DABReceiver<'a> {
                 break;
             }
 
-            if ! self.source.as_ref().ready() {
+            if !self.source.as_ref().ready() {
                 continue;
             }
 

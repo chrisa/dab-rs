@@ -10,7 +10,7 @@ pub struct UepProf {
     pub PadBits: i32,
 }
 
-pub const UEPTABLE: &'static [UepProf] = &[
+pub const UEPTABLE: &[UepProf] = &[
     UepProf {
         BitRate: 32,
         SubChSz: 16,

@@ -15,6 +15,7 @@ trait BufferOps {
     fn push_buffer(&mut self, buffer: &MainServiceChannelBuffer) -> bool;
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 #[enum_dispatch(BufferOps)]
 enum SizedBuffer {
@@ -24,7 +25,6 @@ enum SizedBuffer {
 }
 
 pub struct Buffers<const N: usize> {
-    head: usize,
     sym: usize,
     lframe: usize,
     full: bool,
@@ -51,7 +51,7 @@ impl<const N: usize> fmt::Debug for Buffers<{ N }> {
                 s.push_str(if buf.is_none() { " " } else { "X" });
             }
         }
-        s.push_str(">");
+        s.push('>');
         write!(f, "{}", s)
     }
 }
@@ -68,7 +68,6 @@ impl<const N: usize> BufferOps for Buffers<{ N }> {
         self.symbols[self.lframe][self.sym] = Some(*buffer);
         self.sym = (self.sym + 1) % N;
         if self.sym == 0 {
-            // self.head += 1;
             self.lframe = (self.lframe + 1) % 16;
             if self.lframe == 0 {
                 self.full = true;
@@ -122,7 +121,6 @@ impl SymbolRange {
 pub struct ChannelSymbols {
     ranges: [SymbolRange; 4],
     startcu: u16,
-    endcu: u16,
     pub count: u16,
 }
 
@@ -132,20 +130,17 @@ pub fn new_channel(service: &Service) -> MainServiceChannel<'_> {
     let buffers = match symbols.count {
         1 => SizedBuffer::One(Buffers::<1> {
             symbols: [[None; 1]; 16],
-            head: 0,
             sym: 0,
             lframe: 0,
             full: false,
         }),
         2 => SizedBuffer::Two(Buffers::<2> {
-            head: 0,
             symbols: [[None; 2]; 16],
             sym: 0,
             lframe: 0,
             full: false,
         }),
         3 => SizedBuffer::Three(Buffers::<3> {
-            head: 0,
             symbols: [[None; 3]; 16],
             sym: 0,
             lframe: 0,
@@ -207,7 +202,7 @@ impl<'a> MainServiceChannel<'a> {
                     if frame == self.cur_frame {
                         buffer_full = self.buffers.push_buffer(&self.deinterleave(buffer));
                         if symbol == range.end {
-                            self.cifcnt = self.cifcnt + 1;
+                            self.cifcnt += 1;
                         }
                     } else {
                         dbg!("reset!");
@@ -219,8 +214,8 @@ impl<'a> MainServiceChannel<'a> {
 
         if buffer_full {
             // dbg!("buffer full");
-            let block = Some(self.decode());
-            block
+
+            Some(self.decode())
         } else {
             None
         }

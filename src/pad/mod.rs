@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-use std::cmp;
 use std::io::{self, Write};
 
 use bitvec::prelude::*;
@@ -148,7 +147,7 @@ impl PadState {
 
                 let xpadoff = xpadoff as usize;
 
-                if p.CIFlag == true {
+                if p.CIFlag {
                     self.ci = buf[xpadoff];
                     // eprintln!("bytes: {} xpadoff: {} self.ci: {}", bytes, xpadoff, self.ci);
 
@@ -180,46 +179,44 @@ impl PadState {
                         self.dls_length += dls.f1 + 1;
                         self.first = dls.first;
                     }
-                } else {
-                    if self.ci == 2 {
-                        for i in 0..4 {
-                            if xpadoff < i {
-                                break;
+                } else if self.ci == 2 {
+                    for i in 0..4 {
+                        if xpadoff < i {
+                            break;
+                        }
+                        let idx = xpadoff - i;
+                        if self.left > 2 {
+                            self.segment[self.ptr_index] = buf[idx];
+                            self.ptr_index += 1;
+                            self.left -= 1;
+                            if self.left == 2 {
+                                self.ptr_index = 0; // simulate `ptr = crc`
                             }
-                            let idx = xpadoff - i;
-                            if self.left > 2 {
-                                self.segment[self.ptr_index] = buf[idx];
-                                self.ptr_index += 1;
-                                self.left -= 1;
-                                if self.left == 2 {
-                                    self.ptr_index = 0; // simulate `ptr = crc`
-                                }
-                            } else if self.left > 0 {
-                                self.crc[(2 - self.left) as usize] = buf[idx];
-                                self.left -= 1;
-                            }
+                        } else if self.left > 0 {
+                            self.crc[(2 - self.left) as usize] = buf[idx];
+                            self.left -= 1;
+                        }
+                    }
+
+                    if self.left == 0 {
+                        // crc16check(&self.segment, self.seglen);
+
+                        if (self.seglen as usize) < self.segment.len() {
+                            self.segment[self.seglen as usize] = 0;
                         }
 
-                        if self.left == 0 {
-                            // crc16check(&self.segment, self.seglen);
+                        eprintln!("segment: {}", String::from_utf8_lossy(&self.segment[2..]));
 
-                            if (self.seglen as usize) < self.segment.len() {
-                                self.segment[self.seglen as usize] = 0;
-                            }
+                        // let label_offset = (self.dls_length - (self.seglen - 2)) as usize;
+                        // let copy_len = cmp::min((self.seglen - 2) as usize, self.label.len() - label_offset);
+                        // self.label[label_offset..label_offset + copy_len]
+                        //     .copy_from_slice(&self.segment[2..2 + copy_len]);
 
-                            eprintln!("segment: {}", String::from_utf8_lossy(&self.segment[2..]));
-
-                            // let label_offset = (self.dls_length - (self.seglen - 2)) as usize;
-                            // let copy_len = cmp::min((self.seglen - 2) as usize, self.label.len() - label_offset);
-                            // self.label[label_offset..label_offset + copy_len]
-                            //     .copy_from_slice(&self.segment[2..2 + copy_len]);
-
-                            // if self.first == 1 {
-                            //     self.label[self.dls_length as usize] = 0;
-                            //     let text = String::from_utf8_lossy(&self.label[..self.dls_length as usize]);
-                            //     let _ = writeln!(io::stderr(), "DLS: {}", text);
-                            // }
-                        }
+                        // if self.first == 1 {
+                        //     self.label[self.dls_length as usize] = 0;
+                        //     let text = String::from_utf8_lossy(&self.label[..self.dls_length as usize]);
+                        //     let _ = writeln!(io::stderr(), "DLS: {}", text);
+                        // }
                     }
                 }
             }

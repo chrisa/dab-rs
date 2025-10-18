@@ -11,7 +11,6 @@ pub fn channel_symbols(service: &Service) -> ChannelSymbols {
     let size = subchannel.size();
     let start = subchannel.startaddr();
     let startcu = start % CUSPERSYM;
-    let endcu = (start + size) % CUSPERSYM;
 
     let symbol_0 = SymbolRange {
         start: (start / CUSPERSYM + MSCSTART) as u8,
@@ -34,7 +33,6 @@ pub fn channel_symbols(service: &Service) -> ChannelSymbols {
     ChannelSymbols {
         ranges: symbols.try_into().unwrap(),
         startcu,
-        endcu,
         count,
     }
 }
