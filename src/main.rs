@@ -9,6 +9,8 @@
 use std::sync::mpsc::{self, Receiver};
 
 use clap::Parser;
+use dab::output::mpeg::{self, Mpeg};
+use dab::pad;
 use dab::source::Source;
 use dab::wavefinder::Buffer;
 use dab::{
@@ -18,8 +20,6 @@ use dab::{
     },
     msc::{MainServiceChannel, new_channel},
 };
-use dab::pad;
-use dab::output::mpeg;
 
 #[derive(Debug, Clone, clap::ValueEnum, PartialEq)]
 enum CliSource {
@@ -119,6 +119,7 @@ impl<'a> DABReceiver<'a> {
     fn msc(&self, channel: &mut MainServiceChannel) {
         let mut pad = pad::new_padstate();
         let mut mpeg = mpeg::new_mpeg();
+        mpeg.init();
 
         while let Ok(buffer) = self.rx.recv() {
             if buffer.last {
@@ -126,7 +127,6 @@ impl<'a> DABReceiver<'a> {
             }
 
             if let Some(main) = channel.try_buffer(&buffer) {
-                // dbg!(&main);
                 pad.output(&main);
                 mpeg.output(&main);
             }

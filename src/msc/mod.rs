@@ -227,7 +227,9 @@ impl<'a> MainServiceChannel<'a> {
     }
 
     fn decode(&self) -> MainServiceChannelFrame {
-        let bits = self.decoder.decode(&self.buffers, self.service.subchannel(), &self.symbols);
+        let bits = self
+            .decoder
+            .decode(&self.buffers, self.service.subchannel(), &self.symbols);
         // let bitrate = if let Some(asc) = self.service.subchannel().as_any().downcast_ref::<AudioSubChannel>() {
         //     asc.bitrate
         // }

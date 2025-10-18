@@ -153,7 +153,6 @@ impl PadState {
                     // eprintln!("bytes: {} xpadoff: {} self.ci: {}", bytes, xpadoff, self.ci);
 
                     if self.ci == 2 {
-                        
                         let prefix = u16::from_be_bytes([buf[xpadoff - 1], buf[xpadoff]]);
                         let dls = DlsPad::from_u16(prefix);
 

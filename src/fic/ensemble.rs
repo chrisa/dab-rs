@@ -575,7 +575,7 @@ impl SubChannel for AudioSubChannel {
     }
     // fn as_any(&self) -> &dyn Any {
     //     self
-    // }    
+    // }
 }
 
 impl SubChannel for DataSubChannel {
@@ -602,5 +602,5 @@ impl SubChannel for DataSubChannel {
     }
     // fn as_any(&self) -> &dyn Any {
     //     self
-    // }    
+    // }
 }

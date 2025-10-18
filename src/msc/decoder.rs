@@ -1,9 +1,11 @@
 use libm::floor;
 
 use crate::{
-    decode::{bit_reverse, bits_to_bytes, bytes_to_bits, qpsk_symbol_demapper, scramble, Viterbi, Bit},
+    decode::{
+        Bit, Viterbi, bit_reverse, bits_to_bytes, bytes_to_bits, qpsk_symbol_demapper, scramble,
+    },
     fic::ensemble::{Protection, SubChannel, SubChannelType},
-    msc::{tables::PVEC, Buffers, ChannelSymbols, MainServiceChannelBuffer, SizedBuffer},
+    msc::{Buffers, ChannelSymbols, MainServiceChannelBuffer, SizedBuffer, tables::PVEC},
     new_viterbi,
     wavefinder::Buffer,
 };
@@ -36,8 +38,12 @@ impl MainServiceChannelDecoder {
         }
     }
 
-    pub fn decode(&self, buffers: &SizedBuffer, sc: &dyn SubChannel, sym: &ChannelSymbols) -> Vec<u8> {
-
+    pub fn decode(
+        &self,
+        buffers: &SizedBuffer,
+        sc: &dyn SubChannel,
+        sym: &ChannelSymbols,
+    ) -> Vec<u8> {
         // time disinterleave
         let dis = match buffers {
             SizedBuffer::One(buffers) => self.time_disinterleave::<1>(buffers, sc, sym),
@@ -150,7 +156,7 @@ impl MainServiceChannelDecoder {
     //             *(obuf + k++) = OFFSET - 1 + (*(inbuf + j++) << 1);
     //         else
     //             *(obuf + k++) = OFFSET;
-//     *len = k;
+    //     *len = k;
     //     return 0;
     // }
 

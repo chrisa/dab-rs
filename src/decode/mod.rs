@@ -1,8 +1,8 @@
 mod viterbi;
 
 use itertools::Itertools;
-pub use viterbi::{Viterbi, Bit};
 pub use viterbi::new_viterbi;
+pub use viterbi::{Bit, Viterbi};
 
 const K: i32 = 1536;
 

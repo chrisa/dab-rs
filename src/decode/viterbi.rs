@@ -77,13 +77,14 @@ impl Bit {
         match bit {
             0 => Bit::False,
             1 => Bit::True,
-            u => { panic!("unexpected bit value: {}", u) },
+            u => {
+                panic!("unexpected bit value: {}", u)
+            }
         }
     }
 }
 
 impl Viterbi {
-
     // initialize symbol mapping
     fn vd_init(&mut self) {
         // syms[i] = combined symbol (4 bits -> index into mets)
