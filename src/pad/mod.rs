@@ -12,6 +12,9 @@ pub struct Error {
 
 }
 
+const LABEL_MAX: usize = 256;
+const SEGMENT_MAX: usize = 256;
+
 #[derive(Debug, Clone)]
 pub struct PadState {
     bitrate: i32,
@@ -22,10 +25,10 @@ pub struct PadState {
     ci: u8,
     toggle: bool,
     firstlast: FirstLast,
-    label: [u8; 128],
+    label: [u8; LABEL_MAX],
     offset: usize,
     crc: [u8; 2],
-    segment: [u8; 18],
+    segment: [u8; SEGMENT_MAX],
     ptr_index: usize,
     is_new: bool,
 }
@@ -40,10 +43,10 @@ pub fn new_padstate() -> PadState {
         ci: 0,
         toggle: false,
         firstlast: FirstLast::First,
-        label: [0; 128],
+        label: [0; LABEL_MAX],
         offset: 0,
         crc: [0; 2],
-        segment: [0; 18],
+        segment: [0; SEGMENT_MAX],
         ptr_index: 0,
         is_new: true, // assume first DLS label received is new
     }
@@ -220,9 +223,6 @@ impl PadState {
                             self.segment[self.ptr_index] = buf[idx];
                             self.ptr_index += 1;
                             self.left -= 1;
-                            if self.left == 2 {
-                                self.ptr_index = 0; // simulate `ptr = crc`
-                            }
                         } else if self.left > 0 {
                             self.crc[(2 - self.left) as usize] = buf[idx];
                             self.left -= 1;
@@ -231,10 +231,13 @@ impl PadState {
 
                     if self.left == 0 {
 
+                        let crc = u16::from_be_bytes(self.crc);
+                        eprintln!("crc word: {}", crc);
+
                         // eprintln!("segment: {} seglen: {} firstlast: {:?}", String::from_utf8_lossy(&self.segment[2..]), self.seglen, self.firstlast);
                         match self.firstlast {
                             FirstLast::First => {
-                                self.label = [0; 128];
+                                self.label = [0; LABEL_MAX];
                                 self.offset = self.seglen as usize - 2;
                                 self.label[0..self.offset].copy_from_slice(&self.segment[2..self.seglen as usize]);
                                 return Err(Error{});
@@ -249,18 +252,18 @@ impl PadState {
                                 self.offset += self.seglen as usize - 2;
                                 let label = Label { label: String::from_utf8_lossy(&self.label[0..self.offset]).to_string(), is_new: self.is_new };
                                 // reset here, in case there is no First next time
-                                self.label = [0; 128];
+                                self.label = [0; LABEL_MAX];
                                 self.offset = 0;
                                 self.is_new = false;
                                 return Ok(label);
                             },
                             FirstLast::OneAndOnly => {
-                                self.label = [0; 128];
+                                self.label = [0; LABEL_MAX];
                                 self.offset = self.seglen as usize - 2;
                                 self.label[0..self.offset].copy_from_slice(&self.segment[2..self.seglen as usize]);
                                 let label = Label { label: String::from_utf8_lossy(&self.label[0..self.offset]).to_string(), is_new: self.is_new };
                                 // reset here, in case there is no First next time
-                                self.label = [0; 128];
+                                self.label = [0; LABEL_MAX];
                                 self.offset = 0;
                                 self.is_new = false;
                                 return Ok(label);
