@@ -1,11 +1,7 @@
 #![allow(non_snake_case)]
 
-use std::io::{self, Write};
-
 use bitvec::prelude::*;
-
 use crate::msc::MainServiceChannelFrame;
-
 
 pub struct Label {
     pub label: String,
@@ -54,16 +50,16 @@ pub fn new_padstate() -> PadState {
 }
 
 /// Dummy placeholder for `crc16check`
-fn crc16check(_data: &[u8], _len: i32) {
+fn _crc16check(_data: &[u8], _len: i32) {
     // In real code, implement CRC16 validation here
 }
 
 #[derive(Debug)]
 struct FPad {
-    Z: bool,
+    _Z: bool,
     CIFlag: bool,
-    ByteL: u8,
-    ByteL1: u8,
+    _ByteL: u8,
+    _ByteL1: u8,
     FType: u8,
 }
 
@@ -71,10 +67,10 @@ impl FPad {
     pub fn from_u16(bits: u16) -> Self {
         let bits = bits.view_bits::<Lsb0>();
         Self {
-            Z: bits[0],
+            _Z: bits[0],
             CIFlag: bits[1],
-            ByteL: bits[2..8].load_be(),
-            ByteL1: bits[8..14].load_be(),
+            _ByteL: bits[2..8].load_be(),
+            _ByteL1: bits[8..14].load_be(),
             FType: bits[14..16].load_be(),
         }
     }
@@ -82,28 +78,28 @@ impl FPad {
 
 #[derive(Debug)]
 struct FPad00 {
-    ByteLInd: u8,
+    _ByteLInd: u8,
     XPadInd: u8,
-    FType: u8,
+    _FType: u8,
 }
 
 impl FPad00 {
     pub fn from_u8(bits: u8) -> Self {
         let bits = bits.view_bits::<Lsb0>();
         Self {
-            ByteLInd: bits[0..4].load_be(),
+            _ByteLInd: bits[0..4].load_be(),
             XPadInd: bits[4..6].load_be(),
-            FType: bits[6..8].load_be(),
+            _FType: bits[6..8].load_be(),
         }
     }
 }
 
 #[derive(Debug)]
 struct DlsPad {
-    rfa: u8,
-    f2: u8,
+    _rfa: u8,
+    _f2: u8,
     f1: u8,
-    cmd: bool,
+    _cmd: bool,
     firstlast: FirstLast,
     toggle: bool,
 }
@@ -112,10 +108,10 @@ impl DlsPad {
     pub fn from_u16(bits: u16) -> Self {
         let bits = bits.view_bits::<Lsb0>();
         Self {
-            rfa: bits[0..4].load_be(),
-            f2: bits[4..8].load_be(),
+            _rfa: bits[0..4].load_be(),
+            _f2: bits[4..8].load_be(),
             f1: bits[8..12].load_be(),
-            cmd: bits[12],
+            _cmd: bits[12],
             firstlast: FirstLast::from_u8(bits[13..14].load_be()),
             toggle: bits[15],
         }
