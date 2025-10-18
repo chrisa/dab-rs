@@ -7,6 +7,8 @@
 #![allow(clippy::too_many_arguments)]
 
 use std::sync::mpsc::{self, Receiver};
+use std::thread;
+use std::time::Duration;
 
 use clap::Parser;
 use dab::output::mpeg::{self, Mpeg};
@@ -124,6 +126,10 @@ impl<'a> DABReceiver<'a> {
         while let Ok(buffer) = self.rx.recv() {
             if buffer.last {
                 break;
+            }
+
+            if ! self.source.as_ref().ready() {
+                continue;
             }
 
             if let Some(main) = channel.try_buffer(&buffer) {

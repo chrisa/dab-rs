@@ -55,4 +55,9 @@ impl Source for FileSource {
         dbg!(channel);
         // no-op for file source
     }
+
+    fn ready(&self) -> bool {
+        // file source is always ready
+        true
+    }
 }

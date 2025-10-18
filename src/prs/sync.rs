@@ -70,6 +70,10 @@ impl PhaseReferenceSynchroniser {
         self.selstr = channel.selstr();
     }
 
+    pub fn count(&self) -> i32 {
+        self.count
+    }
+
     fn locked(&self) -> bool {
         self.locked.load(Ordering::Relaxed)
     }
