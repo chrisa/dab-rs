@@ -28,13 +28,13 @@ pub fn new_wavefinder_source(
     tx: Sender<Buffer>,
     path: Option<PathBuf>,
     freq: Option<String>,
-) -> Box<dyn Source> {
-    Box::new(WavefinderSource {
+) -> impl Source {
+    WavefinderSource {
         tx,
         path,
         freq: freq.unwrap_or("225.648".to_owned()),
         sync: None,
-    })
+    }
 }
 
 impl Source for WavefinderSource {
@@ -48,7 +48,7 @@ impl Source for WavefinderSource {
     }
 
     fn select_channel(&mut self, channel: &MainServiceChannel) {
-        dbg!(channel);
+        // dbg!(channel);
 
         if let Some(sync) = &self.sync
             && let Ok(mut s) = sync.lock()

@@ -213,8 +213,6 @@ impl<'a> MainServiceChannel<'a> {
         }
 
         if buffer_full {
-            // dbg!("buffer full");
-
             Some(self.decode())
         } else {
             None
@@ -225,9 +223,6 @@ impl<'a> MainServiceChannel<'a> {
         let bits = self
             .decoder
             .decode(&self.buffers, self.service.subchannel(), &self.symbols);
-        // let bitrate = if let Some(asc) = self.service.subchannel().as_any().downcast_ref::<AudioSubChannel>() {
-        //     asc.bitrate
-        // }
         let bitrate = self.service.subchannel().bitrate();
         MainServiceChannelFrame {
             frame: self.cur_frame,

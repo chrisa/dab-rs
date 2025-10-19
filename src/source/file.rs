@@ -15,8 +15,8 @@ pub struct FileSource {
     path: Option<PathBuf>,
 }
 
-pub fn new_file_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> Box<dyn Source> {
-    Box::new(FileSource { tx, path })
+pub fn new_file_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> impl Source {
+    FileSource { tx, path }
 }
 
 impl Source for FileSource {

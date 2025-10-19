@@ -103,10 +103,10 @@ impl PhaseReferenceSynchroniser {
             if self.lock() {
                 // eprintln!("locked: {:12.10} {:.2}", c, ir);
             } else {
-                eprintln!("not yet locked: {:12.10} {:.2}", c, ir);
+                // eprintln!("not yet locked: {:12.10} {:.2}", c, ir);
             }
         } else {
-            eprintln!("unlocked: {:12.10} {:.2}", c, ir);
+            // eprintln!("unlocked: {:12.10} {:.2}", c, ir);
             self.unlock();
         }
 
