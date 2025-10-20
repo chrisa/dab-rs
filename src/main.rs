@@ -95,7 +95,6 @@ impl DABReceiver {
 
         // FIC
         let ens = self.fic();
-        ens.display();
 
         // If service, MSC
         if let Some(service) = ens.find_service_by_id(&self.service_id) {

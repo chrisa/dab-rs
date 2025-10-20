@@ -1,8 +1,7 @@
 #![allow(non_snake_case)]
 
 use itertools::Itertools;
-use std::sync::atomic::Ordering::Relaxed;
-use std::{collections::HashMap, sync::atomic::AtomicU64};
+use std::collections::HashMap;
 
 use super::fig::{Fig, FigType, Information, LabelPurpose, ServiceComponent};
 
@@ -12,7 +11,7 @@ pub struct Ensemble {
     id: u16,
     name: String,
     services: HashMap<u32, Service>,
-    label_tries: AtomicU64,
+    label_tries: u16,
 }
 
 #[derive(Debug)]
@@ -65,7 +64,7 @@ pub fn new_ensemble() -> Ensemble {
         id: 0,
         name: "Unknown".to_owned(),
         services: HashMap::new(),
-        label_tries: AtomicU64::new(0),
+        label_tries: 0,
     }
 }
 
@@ -183,7 +182,7 @@ pub fn new_data_subchannel(id: u16, primary: bool) -> DataSubChannel {
 // }
 
 impl Ensemble {
-    pub fn is_complete(&self) -> bool {
+    pub fn is_complete(&mut self) -> bool {
         let tries = self.increment_tries();
         let empty = self.services.is_empty();
         let service_labels = self.services_labelled();
@@ -199,18 +198,9 @@ impl Ensemble {
         }
     }
 
-    fn increment_tries(&self) -> u64 {
-        let mut current = self.label_tries.load(Relaxed);
-        loop {
-            let new = current + 1;
-            match self
-                .label_tries
-                .compare_exchange(current, new, Relaxed, Relaxed)
-            {
-                Ok(_) => return current,
-                Err(v) => current = v,
-            }
-        }
+    fn increment_tries(&mut self) -> u16 {
+        self.label_tries += 1;
+        self.label_tries
     }
 
     fn services_labelled(&self) -> bool {
