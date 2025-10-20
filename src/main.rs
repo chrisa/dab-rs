@@ -141,7 +141,7 @@ impl DABReceiver {
         channel: &mut MainServiceChannel,
         mut terminal: DefaultTerminal,
     ) -> Result<()> {
-        let mut pad = pad::new_padstate();
+        let pad = pad::new_padstate();
         let mut mpeg = mpeg::new_mpeg();
         mpeg.init();
 
@@ -150,6 +150,7 @@ impl DABReceiver {
                 break;
             }
             if self.exit {
+                self.source.exit();
                 break;
             }
 
@@ -193,9 +194,8 @@ impl DABReceiver {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        match key_event.code {
-            KeyCode::Char('q') => self.exit(),
-            _ => {}
+        if let KeyCode::Char('q') = key_event.code {
+            self.exit()
         }
     }
 

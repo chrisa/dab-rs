@@ -18,6 +18,7 @@ use super::Source;
 static LOCKED: AtomicBool = AtomicBool::new(false);
 
 pub struct WavefinderSource {
+    exit: Arc<Mutex<bool>>,
     tx: Sender<Buffer>,
     path: Option<PathBuf>,
     freq: String,
@@ -29,7 +30,9 @@ pub fn new_wavefinder_source(
     path: Option<PathBuf>,
     freq: Option<String>,
 ) -> impl Source {
+    let exit = Arc::new(Mutex::new(false));
     WavefinderSource {
+        exit,
         tx,
         path,
         freq: freq.unwrap_or("225.648".to_owned()),
@@ -45,6 +48,12 @@ impl Source for WavefinderSource {
             return s.count() == 0;
         }
         false
+    }
+
+    fn exit(&mut self) {
+        if let Ok(mut e) = self.exit.lock() {
+            *e = true;
+        }
     }
 
     fn select_channel(&mut self, channel: &MainServiceChannel) {
@@ -66,6 +75,8 @@ impl Source for WavefinderSource {
         let sync = Arc::new(Mutex::new(new_synchroniser(&LOCKED)));
         self.sync = Some(sync.clone());
 
+        let exit = self.exit.clone();
+
         thread::spawn(move || {
             let mut w: Wavefinder = wavefinder::open();
             let prs = RefCell::new(prs::new_symbol());
@@ -74,8 +85,16 @@ impl Source for WavefinderSource {
             let (prs_tx, prs_rx) = mpsc::channel();
             let (file_tx, file_rx) = mpsc::channel::<Buffer>();
 
+            let prs_exit = exit.clone();
+
             thread::spawn(move || {
                 loop {
+                    if let Ok(e) = prs_exit.lock()
+                        && *e
+                    {
+                        break;
+                    }
+
                     let result = prs_rx.recv();
                     if let Ok(complete_prs) = result
                         && let Ok(mut s) = sync.lock()
@@ -133,6 +152,12 @@ impl Source for WavefinderSource {
             w.read();
 
             loop {
+                if let Ok(e) = exit.lock()
+                    && *e
+                {
+                    break;
+                }
+
                 w.handle_events();
                 while let Ok(m) = message_rx.try_recv() {
                     w.send_ctrl_message(&m);
