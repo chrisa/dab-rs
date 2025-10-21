@@ -2,7 +2,7 @@ use std::{
     fs::File,
     io::BufReader,
     path::PathBuf,
-    sync::{Arc, Mutex, mpsc::Sender},
+    sync::{mpsc::{self, Receiver, Sender}, Arc, Mutex},
     thread::{self, JoinHandle},
 };
 
@@ -12,21 +12,20 @@ use super::Source;
 
 pub struct FileSource {
     exit: Arc<Mutex<bool>>,
-    tx: Sender<Buffer>,
     path: Option<PathBuf>,
 }
 
-pub fn new_file_source(tx: Sender<Buffer>, path: Option<PathBuf>) -> impl Source {
+pub fn new_file_source(path: Option<PathBuf>) -> Box<dyn Source + Send + Sync> {
     let exit = Arc::new(Mutex::new(false));
-    FileSource { exit, tx, path }
+    Box::new(FileSource { exit, path })
 }
 
 impl Source for FileSource {
-    fn run(&mut self) -> JoinHandle<()> {
+    fn run(&mut self) -> (Receiver<Buffer>, JoinHandle<()>) {
+        let (source_tx, source_rx) = mpsc::channel();
         let path = self.path.clone();
-        let tx = self.tx.clone();
         let exit = self.exit.clone();
-        thread::spawn(move || {
+        let source_t = thread::spawn(move || {
             let mut buf;
             if let Some(p) = path {
                 let file = File::open(&p);
@@ -47,16 +46,17 @@ impl Source for FileSource {
                 }
                 let result = Buffer::read_from_file(&mut buf);
                 let Ok(buffer) = result else {
-                    tx.send(Buffer {
+                    source_tx.send(Buffer {
                         bytes: [0; 524],
                         last: true,
                     })
                     .unwrap();
                     break;
                 };
-                tx.send(buffer).unwrap();
+                source_tx.send(buffer).unwrap();
             }
-        })
+        });
+        (source_rx, source_t)
     }
 
     fn select_channel(&mut self, channel: &MainServiceChannel) {

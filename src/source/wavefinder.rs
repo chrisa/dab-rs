@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::mpsc::{self, Sender};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
@@ -19,25 +19,22 @@ static LOCKED: AtomicBool = AtomicBool::new(false);
 
 pub struct WavefinderSource {
     exit: Arc<Mutex<bool>>,
-    tx: Sender<Buffer>,
     path: Option<PathBuf>,
     freq: String,
     sync: Option<Arc<Mutex<PhaseReferenceSynchroniser>>>,
 }
 
 pub fn new_wavefinder_source(
-    tx: Sender<Buffer>,
     path: Option<PathBuf>,
     freq: Option<String>,
-) -> impl Source {
+) -> Box<dyn Source + Send + Sync> {
     let exit = Arc::new(Mutex::new(false));
-    WavefinderSource {
+    Box::new(WavefinderSource {
         exit,
-        tx,
         path,
         freq: freq.unwrap_or("225.648".to_owned()),
         sync: None,
-    }
+    })
 }
 
 impl Source for WavefinderSource {
@@ -66,10 +63,9 @@ impl Source for WavefinderSource {
         }
     }
 
-    fn run(&mut self) -> JoinHandle<()> {
+    fn run(&mut self) -> (Receiver<Buffer>, JoinHandle<()>) {
         let file_output = self.path.is_some();
         let path = self.path.clone();
-        let tx = self.tx.clone();
         let freq = self.freq.clone();
 
         let sync = Arc::new(Mutex::new(new_synchroniser(&LOCKED)));
@@ -77,7 +73,9 @@ impl Source for WavefinderSource {
 
         let exit = self.exit.clone();
 
-        thread::spawn(move || {
+        let (source_tx, source_rx) = mpsc::channel();
+
+        let source_t = thread::spawn(move || {
             let mut w: Wavefinder = wavefinder::open();
             let prs = RefCell::new(prs::new_symbol());
 
@@ -101,7 +99,9 @@ impl Source for WavefinderSource {
                     {
                         let messages = s.try_sync_prs(complete_prs);
                         for m in messages {
-                            message_tx.send(m).unwrap(); // handle Err?
+                            if let Err(_) = message_tx.send(m) {
+                                break;
+                            }
                         }
                     }
                 }
@@ -132,7 +132,7 @@ impl Source for WavefinderSource {
                 }
 
                 if LOCKED.load(std::sync::atomic::Ordering::Relaxed) {
-                    tx.send(buffer).unwrap();
+                    source_tx.send(buffer).unwrap();
 
                     // File writer
                     if file_output {
@@ -163,6 +163,8 @@ impl Source for WavefinderSource {
                     w.send_ctrl_message(&m);
                 }
             }
-        })
+        });
+
+        (source_rx, source_t)
     }
 }
