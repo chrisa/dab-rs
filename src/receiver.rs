@@ -66,9 +66,15 @@ impl DABReceiver {
                 .expect("sending ensemble to app");
 
             // If service, MSC
-            if let Some(service) = ens.find_service_by_id(&service_id) {
+            if let Some(service) = ens.find_service_by_id_str(&service_id) {
                 let mut msc = new_channel(service);
                 source.as_mut().select_channel(&msc);
+
+                ui_tx
+                    .send(UiEvent {
+                        data: EventData::Service(service.clone()),
+                    })
+                    .expect("sending service to app");
 
                 let pad = pad::new_padstate();
                 let mut mpeg = mpeg::new_mpeg();
@@ -86,6 +92,14 @@ impl DABReceiver {
                             } => {
                                 source.exit();
                                 break 'msc;
+                            },
+                            ControlEvent {
+                                data: ControlData::Select(service_id),
+                            } => {
+                                if let Some(service) = ens.find_service_by_id(service_id) {
+                                    msc = new_channel(service);
+                                    source.as_mut().select_channel(&msc);
+                                }
                             }
                             _ => todo!(),
                         }

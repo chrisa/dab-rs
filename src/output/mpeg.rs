@@ -85,22 +85,22 @@ impl Mpeg {
             let header_int = u32::from_be_bytes(header_bytes);
             let header = Mp2Header::from_u32(header_int);
             if ((header_int & HMASK) ^ HXOR) != 0 {
-                eprintln!("header mask check failed: {:x}", header_int);
+                // eprintln!("header mask check failed: {:x}", header_int);
                 self.header_valid = false;
             } else if !header.id {
                 self.header_expected = false;
                 if LBRTAB[header.bit_rate_index as usize] != frame.bitrate as i16 {
-                    eprintln!(
-                        "Low bitrate conflict FIC: {} MP2 header: {}",
-                        frame.bitrate, LBRTAB[header.bit_rate_index as usize]
-                    );
+                    // eprintln!(
+                    //     "Low bitrate conflict FIC: {} MP2 header: {}",
+                    //     frame.bitrate, LBRTAB[header.bit_rate_index as usize]
+                    // );
                     self.header_valid = false;
                 }
             } else if BRTAB[header.bit_rate_index as usize] != frame.bitrate as i16 {
-                eprintln!(
-                    "Bitrate conflict FIC: {} MP2 header: {}",
-                    frame.bitrate, BRTAB[header.bit_rate_index as usize]
-                );
+                // eprintln!(
+                //     "Bitrate conflict FIC: {} MP2 header: {}",
+                //     frame.bitrate, BRTAB[header.bit_rate_index as usize]
+                // );
                 self.header_valid = false;
             }
         } else {

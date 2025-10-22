@@ -15,6 +15,7 @@ use color_eyre::Result;
 use dab::fic::ensemble::{Ensemble, Service};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, poll};
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::style::{Modifier, Style};
 use ratatui::symbols::border;
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Cell, Paragraph, Row, Table, TableState};
@@ -72,7 +73,13 @@ impl App {
                         data: EventData::Ensemble(ensemble),
                     } => {
                         self.ensemble = Some(ensemble);
-                    }
+                    },
+                    UiEvent {
+                        data: EventData::Service(service),
+                    } => {
+                        self.service = Some(service);
+                        self.set_selected_service();
+                    },
                     _ => todo!("unexpected event"),
                 }
             }
@@ -85,6 +92,14 @@ impl App {
         // todo propagate properly
         let result = receiver_t.join();
         Ok(())
+    }
+
+    fn set_selected_service(&mut self) {
+        for (i, s) in self.ensemble.as_ref().unwrap().services().into_iter().enumerate() {
+            if self.service.as_ref().unwrap().id == s.id {
+                self.tablestate.select(Some(i));
+            }
+        }
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -100,17 +115,77 @@ impl App {
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-        if let KeyCode::Char('q') = key_event.code {
-            self.exit = true;
+         match key_event.code {
+            KeyCode::Char('q') | KeyCode::Esc => self.quit(),
+            KeyCode::Char('j') | KeyCode::Down => self.next_row(),
+            KeyCode::Char('k') | KeyCode::Up => self.previous_row(),
+            KeyCode::Enter => self.select_service(),
+            _ => return,
+         }
+    }
+
+    fn select_service(&mut self) {
+        if self.ensemble.is_none() {
+            return;
+        }
+        if let Some(i) = self.tablestate.selected() {
+            let service = self.ensemble.as_ref().unwrap().services()[i];
             if self
                 .control_tx
                 .send(ControlEvent {
-                    data: ControlData::Stop(),
+                    data: ControlData::Select(service.id),
                 })
                 .is_err()
             {
-                eprintln!("failed to send q");
+                eprintln!("failed to send Enter");
             }
+        }
+    }
+
+    fn next_row(&mut self) {
+        if self.ensemble.is_none() {
+            return;
+        }
+        let i = match self.tablestate.selected() {
+            Some(i) => {
+                if i >= self.ensemble.as_ref().unwrap().services().len() - 1 {
+                    0
+                } else {
+                    i + 1
+                }
+            }
+            None => 0,
+        };
+        self.tablestate.select(Some(i));
+    }
+
+    fn previous_row(&mut self) {
+        if self.ensemble.is_none() {
+            return;
+        }
+        let i = match self.tablestate.selected() {
+            Some(i) => {
+                if i == 0 {
+                    self.ensemble.as_ref().unwrap().services().len() - 1
+                } else {
+                    i - 1
+                }
+            }
+            None => 0,
+        };
+        self.tablestate.select(Some(i));
+    }
+
+    fn quit(&mut self) {
+        self.exit = true;
+        if self
+            .control_tx
+            .send(ControlEvent {
+                data: ControlData::Stop(),
+            })
+            .is_err()
+        {
+            eprintln!("failed to send q");
         }
     }
 
@@ -181,6 +256,9 @@ impl App {
             .title(bottom_title.centered())
             .border_set(border::THICK);
 
+        let selected_row_style = Style::default()
+            .add_modifier(Modifier::REVERSED);
+
         let table = Table::new(
             rows,
             [
@@ -192,7 +270,9 @@ impl App {
             ],
         )
         .header(header)
-        .block(bottom_block);
+        .block(bottom_block)
+        .row_highlight_style(selected_row_style);
+
         frame.render_stateful_widget(table, area, &mut self.tablestate);
     }
 }

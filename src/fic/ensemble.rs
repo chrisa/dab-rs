@@ -191,12 +191,16 @@ impl Ensemble {
         tries > 100 || (!empty && service_labels && ensemble_label)
     }
 
-    pub fn find_service_by_id(&self, id_str: &str) -> Option<&Service> {
+    pub fn find_service_by_id_str(&self, id_str: &str) -> Option<&Service> {
         if let Ok(id) = u32::from_str_radix(id_str, 16) {
             self.services.values().find(|s| s.id == id)
         } else {
             None
         }
+    }
+
+    pub fn find_service_by_id(&self, id: u32) -> Option<&Service> {
+        self.services.values().find(|s| s.id == id)
     }
 
     fn increment_tries(&mut self) -> u16 {

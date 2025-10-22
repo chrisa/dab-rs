@@ -27,7 +27,7 @@ pub struct UiEvent {
 
 pub enum ControlData {
     Tune(f64),
-    ServiceId(u16),
+    Select(u32),
     Stop(),
 }
 
