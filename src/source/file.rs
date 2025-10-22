@@ -2,7 +2,10 @@ use std::{
     fs::File,
     io::BufReader,
     path::PathBuf,
-    sync::{mpsc::{self, Receiver, Sender}, Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        mpsc::{self, Receiver},
+    },
     thread::{self, JoinHandle},
 };
 
@@ -46,11 +49,12 @@ impl Source for FileSource {
                 }
                 let result = Buffer::read_from_file(&mut buf);
                 let Ok(buffer) = result else {
-                    source_tx.send(Buffer {
-                        bytes: [0; 524],
-                        last: true,
-                    })
-                    .unwrap();
+                    source_tx
+                        .send(Buffer {
+                            bytes: [0; 524],
+                            last: true,
+                        })
+                        .unwrap();
                     break;
                 };
                 source_tx.send(buffer).unwrap();

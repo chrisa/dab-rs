@@ -58,10 +58,10 @@ impl FastInformationChannelDecoder {
         } else if buffer.symbol == 2 {
             frame = new_frame(buffer.frame);
         } else {
-            println!(
-                "can't handle frame {:?} symbol {:?} right now",
-                buffer.frame, buffer.symbol
-            );
+            // println!(
+            //     "can't handle frame {:?} symbol {:?} right now",
+            //     buffer.frame, buffer.symbol
+            // );
             return None;
         }
 
@@ -75,7 +75,7 @@ impl FastInformationChannelDecoder {
                 return Some(blocks);
             } else {
                 // CRC check failed
-                println!("frame {:?} failed crc", frame.frame_number);
+                // println!("frame {:?} failed crc", frame.frame_number);
                 self.frames[frame.frame_number as usize] = None;
                 return None;
             }

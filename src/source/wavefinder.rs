@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Receiver};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
@@ -99,7 +99,7 @@ impl Source for WavefinderSource {
                     {
                         let messages = s.try_sync_prs(complete_prs);
                         for m in messages {
-                            if let Err(_) = message_tx.send(m) {
+                            if message_tx.send(m).is_err() {
                                 break;
                             }
                         }

@@ -7,6 +7,7 @@ use super::fig::{Fig, FigType, Information, LabelPurpose, ServiceComponent};
 
 use crate::msc::tables::{UEPTABLE, UepProf};
 
+#[derive(Clone)]
 pub struct Ensemble {
     id: u16,
     name: String,
@@ -14,7 +15,7 @@ pub struct Ensemble {
     label_tries: u16,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Service {
     pub id: u32,
     pub name: String,
@@ -22,7 +23,7 @@ pub struct Service {
     data_subchannels: HashMap<u16, DataSubChannel>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AudioSubChannel {
     id: u8,
     primary: bool,
@@ -34,7 +35,7 @@ pub struct AudioSubChannel {
     uep_index: usize,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DataSubChannel {
     id: u16,
     subchid: u8,
@@ -214,14 +215,21 @@ impl Ensemble {
         self.name != "Unknown"
     }
 
+    pub fn label(&self) -> &str {
+        &self.name
+    }
+
+    pub fn services(&self) -> Vec<&Service> {
+        self.services
+            .values()
+            .sorted_by(|a, b| Ord::cmp(&a.id, &b.id))
+            .collect_vec()
+    }
+
     pub fn display(&self) {
         eprintln!("Ensemble:");
         eprintln!("{:16} (0x{:04x})", self.name, self.id);
-        for service in self
-            .services
-            .values()
-            .sorted_by(|a, b| Ord::cmp(&a.id, &b.id))
-        {
+        for service in self.services() {
             for subchannel in service.audio_subchannels.values() {
                 let PS = if subchannel.primary { "Pri" } else { "Sec " };
                 eprintln!(
@@ -488,6 +496,10 @@ impl Ensemble {
 }
 
 impl Service {
+    pub fn label(&self) -> &str {
+        &self.name
+    }
+
     // TODO; deal with more than one subchannel
     pub fn subchannel(&self) -> &dyn SubChannel {
         if let Some(subchannel) = self.audio_subchannels.values().next() {

@@ -1,27 +1,17 @@
-use std::thread::JoinHandle;
-use std::{io, thread};
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::time::Duration;
+use std::thread;
+use std::thread::JoinHandle;
 
-use color_eyre::eyre::ErrReport;
-use color_eyre::Result;
-
-use crate::fic::ensemble::Service;
 use crate::output::mpeg::{self};
-use crate::{pad, ControlData};
-use crate::source::Source;
-use crate::wavefinder::Buffer;
+use crate::{Cli, CliSource, ControlEvent, UiEvent};
+use crate::{ControlData, EventData, pad};
 use crate::{
-    fic::{
-        FastInformationChannelBuffer,
-        ensemble::{Ensemble, new_ensemble},
-    },
-    msc::{MainServiceChannel, new_channel},
+    fic::{FastInformationChannelBuffer, ensemble::new_ensemble},
+    msc::new_channel,
 };
-use crate::{UiEvent, ControlEvent, Cli, CliSource};
 
 pub struct DABReceiver {
-    args: Cli
+    args: Cli,
 }
 
 pub fn new_receiver(args: Cli) -> DABReceiver {
@@ -29,7 +19,6 @@ pub fn new_receiver(args: Cli) -> DABReceiver {
 }
 
 impl DABReceiver {
-
     pub fn run(&mut self) -> (Receiver<UiEvent>, Sender<ControlEvent>, JoinHandle<()>) {
         let mut source = match self.args.source {
             CliSource::Wavefinder => crate::source::wavefinder::new_wavefinder_source(
@@ -49,7 +38,6 @@ impl DABReceiver {
         let service_id = self.args.service.clone();
 
         let receiver_t = thread::spawn(move || {
-
             // FIC
 
             while let Ok(buffer) = source_rx.recv() {
@@ -71,13 +59,16 @@ impl DABReceiver {
                 }
             }
 
-            // self.ui_tx.send(UiEvent{ data: EventData::Ensemble(ens) });
+            ui_tx
+                .send(UiEvent {
+                    data: EventData::Ensemble(ens.clone()),
+                })
+                .expect("sending ensemble to app");
 
             // If service, MSC
             if let Some(service) = ens.find_service_by_id(&service_id) {
                 let mut msc = new_channel(service);
                 source.as_mut().select_channel(&msc);
-
 
                 let pad = pad::new_padstate();
                 let mut mpeg = mpeg::new_mpeg();
@@ -90,11 +81,13 @@ impl DABReceiver {
 
                     if let Ok(msg) = control_rx.try_recv() {
                         match msg {
-                            ControlEvent { data: ControlData::Stop() } => {
+                            ControlEvent {
+                                data: ControlData::Stop(),
+                            } => {
                                 source.exit();
                                 break 'msc;
-                            },
-                            _ => todo!()
+                            }
+                            _ => todo!(),
                         }
                     }
 
@@ -113,7 +106,6 @@ impl DABReceiver {
 
                 source_t.join().unwrap();
             }
-
         });
 
         (ui_rx, control_tx, receiver_t)

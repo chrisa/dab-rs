@@ -32,9 +32,8 @@ pub enum ControlData {
 }
 
 pub struct ControlEvent {
-    pub data: ControlData
+    pub data: ControlData,
 }
-
 
 #[derive(Debug, Clone, clap::ValueEnum, PartialEq)]
 pub enum CliSource {
