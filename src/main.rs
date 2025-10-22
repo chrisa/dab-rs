@@ -17,7 +17,7 @@ use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, po
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::symbols::border;
 use ratatui::text::{Line, Text};
-use ratatui::widgets::{Block, Cell, Paragraph, Row, StatefulWidget, Table, TableState, Widget};
+use ratatui::widgets::{Block, Cell, Paragraph, Row, Table, TableState};
 use ratatui::{DefaultTerminal, Frame};
 
 use clap::Parser;
@@ -30,6 +30,7 @@ struct App {
     ui_rx: Receiver<UiEvent>,
     ensemble: Option<Ensemble>,
     service: Option<Service>,
+    tablestate: TableState,
 }
 
 fn main() -> Result<()> {
@@ -46,6 +47,7 @@ fn main() -> Result<()> {
         ensemble: None,
         service: None,
         exit: false,
+        tablestate: TableState::default().with_selected(0),
     };
     let result = app.run(terminal, receiver_t);
 
@@ -55,10 +57,8 @@ fn main() -> Result<()> {
 
 impl App {
     fn run(&mut self, mut terminal: DefaultTerminal, receiver_t: JoinHandle<()>) -> Result<()> {
-        let mut tablestate = TableState::default().with_selected(0);
-
         loop {
-            terminal.draw(|frame| self.draw(frame, &mut tablestate))?;
+            terminal.draw(|frame| self.draw(frame))?;
 
             if let Ok(events) = poll(Duration::from_millis(100))
                 && events
@@ -85,11 +85,6 @@ impl App {
         // todo propagate properly
         let result = receiver_t.join();
         Ok(())
-    }
-
-    fn draw(&mut self, frame: &mut Frame, tablestate: &mut TableState) {
-        frame.render_stateful_widget(self, frame.area(), tablestate);
-        // frame.render_widget(self, frame.area());
     }
 
     fn handle_events(&mut self) -> io::Result<()> {
@@ -119,8 +114,37 @@ impl App {
         }
     }
 
-    fn render_table(&'_ self) -> Option<Table<'_>> {
-        self.ensemble.as_ref()?;
+    fn draw(&mut self, frame: &mut Frame) {
+        let top_title = Line::from(" Wavefinder Receiver ");
+        let top_block = Block::bordered()
+            .title(top_title.centered())
+            .border_set(border::THICK);
+
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![Constraint::Percentage(20), Constraint::Percentage(80)])
+            .split(frame.area());
+
+        if self.ensemble.is_some() {
+            let status_text = Line::from("Ensemble Found");
+
+            frame.render_widget(
+                Paragraph::new(status_text).centered().block(top_block),
+                layout[0],
+            );
+
+            self.render_table(frame, layout[1]);
+        } else {
+            let status_text = Line::from("Starting Up");
+
+            frame.render_widget(
+                Paragraph::new(status_text).centered().block(top_block),
+                layout[0],
+            );
+        }
+    }
+
+    fn render_table(&mut self, frame: &mut Frame, area: Rect) {
         let ensemble = self.ensemble.as_ref().unwrap();
 
         let header = ["Ensemble", "Label", "Id", "Bitrate", "Type"]
@@ -152,57 +176,23 @@ impl App {
                 .height(1)
             });
 
-        Some(
-            Table::new(
-                rows,
-                [
-                    Constraint::Length(18),
-                    Constraint::Length(18),
-                    Constraint::Length(4),
-                    Constraint::Length(7),
-                    Constraint::Length(20),
-                ],
-            )
-            .header(header),
-        )
-    }
-}
-
-impl StatefulWidget for &mut App {
-    type State = TableState;
-
-    fn render(self, area: Rect, buf: &mut ratatui::buffer::Buffer, state: &mut Self::State) {
-        let top_title = Line::from(" Wavefinder Receiver ");
-        let top_block = Block::bordered()
-            .title(top_title.centered())
-            .border_set(border::THICK);
-
         let bottom_title = Line::from(" Ensemble Details ");
         let bottom_block = Block::bordered()
             .title(bottom_title.centered())
             .border_set(border::THICK);
 
-        let layout = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(20), Constraint::Percentage(80)])
-            .split(area);
-
-        if let Some(table) = self.render_table() {
-            let status_text = Line::from("Ensemble Found");
-            let table = table.block(bottom_block);
-            Paragraph::new(status_text)
-                .centered()
-                .block(top_block)
-                .render(layout[0], buf);
-
-            StatefulWidget::render(table, layout[1], buf, state);
-        } else {
-            let status_text = Line::from("Starting Up");
-
-            Paragraph::new(status_text)
-                .centered()
-                .block(top_block)
-                .render(layout[0], buf);
-        }
+        let table = Table::new(
+            rows,
+            [
+                Constraint::Length(18),
+                Constraint::Length(18),
+                Constraint::Length(4),
+                Constraint::Length(7),
+                Constraint::Length(20),
+            ],
+        )
+        .header(header)
+        .block(bottom_block);
+        frame.render_stateful_widget(table, area, &mut self.tablestate);
     }
 }

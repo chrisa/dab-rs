@@ -127,8 +127,8 @@ impl Mpeg {
                         _ => panic!("unexpected audio format"),
                     }
                 }
-                Err(e) => {
-                    eprintln!("Frame decode error: {:?}", e);
+                Err(_) => {
+                    // eprintln!("Frame decode error: {:?}", e);
                     // Continue on decode errors (or break depending on your use case).
                 }
             }
