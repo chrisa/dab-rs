@@ -132,9 +132,10 @@ impl<'a> DABReceiver<'a> {
 
             if let Some(main) = channel.try_buffer(&buffer) {
                 if let Ok(label) = pad.output(&main)
-                    && label.is_new {
-                        eprintln!("DLS: {}", label.label);
-                    }
+                    && label.is_new
+                {
+                    eprintln!("DLS: {}", label.label);
+                }
                 mpeg.output(&main);
             }
         }

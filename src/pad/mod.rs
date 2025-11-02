@@ -1,16 +1,14 @@
 #![allow(non_snake_case)]
 
-use bitvec::prelude::*;
 use crate::msc::MainServiceChannelFrame;
+use bitvec::prelude::*;
 
 pub struct Label {
     pub label: String,
     pub is_new: bool,
 }
 
-pub struct Error {
-
-}
+pub struct Error {}
 
 const LABEL_MAX: usize = 128;
 const SEGMENT_MAX: usize = 16;
@@ -162,97 +160,108 @@ impl FirstLast {
 
 impl PadState {
     pub fn output(&mut self, frame: &MainServiceChannelFrame) -> Result<Label, Error> {
-        let buf = &frame.bits;
-        let bytes = buf.len();
+        let bits = &frame.bits;
+        let bytes = bits.len();
         if bytes < 2 {
-            return Err(Error{});
+            return Err(Error {});
         }
 
-        let scf_words = if self.sampling_freq == 48 {
-            if self.bitrate >= 56 { 4 } else { 2 }
-        } else {
-            4
-        };
-
-        let fpad = u16::from_be_bytes([buf[bytes - 2], buf[bytes - 1]]);
+        let fpad = u16::from_be_bytes([bits[bytes - 2], bits[bytes - 1]]);
         let p = FPad::from_u16(fpad);
 
         if p.FType == 0 {
             let p00 = FPad00::from_u8(p.ByteL1);
+            return self.fpad00(bits, p, p00);
+        }
 
-            if p00.XPadInd == XPadInd::ShortXPad {
-                let xpadoff = bytes - (scf_words + 2);
-                let xpad = &buf[(xpadoff-4)..xpadoff];
+        Err(Error {})
+    }
 
-                if p.CIFlag {
+    fn scf_words(&self) -> usize {
+        if self.sampling_freq == 48 {
+            if self.bitrate >= 56 { 4 } else { 2 }
+        } else {
+            4
+        }
+    }
 
-                    self.ci = xpad[3];
-                    if self.ci == 2 { // DLS, start of X-PAD data group
-                        let prefix = u16::from_be_bytes([xpad[2], xpad[1]]);
-                        let dls = DlsPad::from_u16(prefix);
+    fn fpad00(&mut self, bits: &[u8], p: FPad, p00: FPad00) -> Result<Label, Error> {
+        if p00.XPadInd == XPadInd::ShortXPad {
+            let xpadoff = bits.len() - (self.scf_words() + 2);
+            let xpad = &bits[(xpadoff - 4)..xpadoff];
 
-                        if dls.firstlast == FirstLast::First {
-                            if dls.toggle != self.toggle {
-                                self.toggle = dls.toggle;
-                                self.is_new = true;
-                            }
+            if p.CIFlag {
+                self.ci = xpad[3];
+                if self.ci == 2 {
+                    // DLS, start of X-PAD data group
+                    let prefix = u16::from_be_bytes([xpad[2], xpad[1]]);
+                    let dls = DlsPad::from_u16(prefix);
+
+                    if dls.firstlast == FirstLast::First && dls.toggle != self.toggle {
+                        self.toggle = dls.toggle;
+                        self.is_new = true;
+                    }
+
+                    if dls.cmd == 0 {
+                        // f1 is segment length
+                        self.seglen = dls.f1 as usize + 1;
+                        self.offset = 0;
+                        self.crc_offset = 0;
+                    }
+                    if dls.cmd == 1 {
+                        // f1 is "special command"
+                        eprintln!("special command: {}", dls.f1);
+                    }
+                    if dls.firstlast == FirstLast::First || dls.firstlast == FirstLast::OneAndOnly {
+                        eprintln!("charset: {}", dls.f2);
+                    }
+                    if dls.firstlast == FirstLast::Intermediate || dls.firstlast == FirstLast::Last
+                    {
+                        self.segnum = dls.f2;
+
+                        // Catch first-time issue: coming in part way through a label
+                        if self.segnum > 0 && self.label_offset == 0 {
+                            self.ci = 0;
+                            return Err(Error {});
                         }
+                    }
 
-                        if dls.cmd == 0 { // f1 is segment length
-                            self.seglen = dls.f1 as usize + 1;
-                            self.offset = 0;
-                            self.crc_offset = 0;
-                        }
-                        if dls.cmd == 1 { // f1 is "special command"
-                            eprintln!("special command: {}", dls.f1);
-                        }
-                        if dls.firstlast == FirstLast::First || dls.firstlast == FirstLast::OneAndOnly {
-                            eprintln!("charset: {}", dls.f2);
-                        }
-                        if dls.firstlast == FirstLast::Intermediate || dls.firstlast == FirstLast::Last {
-                            self.segnum = dls.f2;
+                    self.segment = [0; 16];
+                    self.segment[self.offset] = xpad[0];
+                    self.offset += 1;
+                    self.firstlast = dls.firstlast;
 
-                            // Catch first-time issue: coming in part way through a label
-                            if self.segnum > 0 && self.label_offset == 0 {
-                                self.ci = 0;
-                                return Err(Error{});
-                            }
-                        }
-
-                        self.segment = [0; 16];
-                        self.segment[self.offset] = xpad[0];
+                    if self.segnum == 0 {
+                        self.label = [0; 128];
+                        self.label_offset = 0;
+                    }
+                }
+            } else if self.ci == 2 {
+                // previously set CI == 2
+                for i in 0..4 {
+                    if self.offset < self.seglen {
+                        self.segment[self.offset] = xpad[3 - i];
                         self.offset += 1;
-                        self.firstlast = dls.firstlast;
-
-                        if self.segnum == 0 {
-                            self.label = [0; 128];
-                            self.label_offset = 0;
-                        }
-
+                    } else if self.crc_offset < 2 {
+                        self.crc[self.crc_offset] = xpad[3 - i];
+                        self.crc_offset += 1;
                     }
-                } else if self.ci == 2 { // previously set CI == 2
-                    for i in 0..4 {
-                        if self.offset < self.seglen {
-                            self.segment[self.offset] = xpad[3 - i];
-                            self.offset += 1;
-                        }
-                        else if self.crc_offset < 2 {
-                            self.crc[self.crc_offset] = xpad[3 - i];
-                            self.crc_offset += 1;
-                        }
-                    }
+                }
 
-                    if self.offset == self.seglen && self.crc_offset == 2 {
-                        self.label[self.label_offset..(self.label_offset + self.seglen)].copy_from_slice(&self.segment[0..self.seglen]);
-                        self.label_offset += self.seglen;
+                if self.offset == self.seglen && self.crc_offset == 2 {
+                    self.label[self.label_offset..(self.label_offset + self.seglen)]
+                        .copy_from_slice(&self.segment[0..self.seglen]);
+                    self.label_offset += self.seglen;
 
-                        if self.firstlast == FirstLast::Last {
-                            eprintln!("DLS: {}", String::from_utf8_lossy(&self.label));
-                        }
+                    if self.firstlast == FirstLast::Last {
+                        return Ok(Label {
+                            is_new: self.is_new,
+                            label: String::from_utf8_lossy(&self.label).to_string(),
+                        });
                     }
                 }
             }
         }
-        Err(Error{})
+        Err(Error {})
     }
 }
