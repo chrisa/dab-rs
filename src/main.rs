@@ -31,6 +31,7 @@ struct App {
     ui_rx: Receiver<UiEvent>,
     ensemble: Option<Ensemble>,
     service: Option<Service>,
+    label: Option<String>,
     tablestate: TableState,
 }
 
@@ -47,6 +48,7 @@ fn main() -> Result<()> {
         control_tx,
         ensemble: None,
         service: None,
+        label: None,
         exit: false,
         tablestate: TableState::default().with_selected(0),
     };
@@ -80,7 +82,11 @@ impl App {
                         self.service = Some(service);
                         self.set_selected_service();
                     },
-                    _ => todo!("unexpected event"),
+                    UiEvent {
+                        data: EventData::Label(label),
+                    } => {
+                        self.label = Some(label);
+                    }
                 }
             }
 
@@ -195,9 +201,14 @@ impl App {
             .title(top_title.centered())
             .border_set(border::THICK);
 
+        let dls_title = Line::from(" DLS ");
+        let dls_block = Block::bordered()
+            .title(dls_title.centered())
+            .border_set(border::THICK);
+
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(20), Constraint::Percentage(80)])
+            .constraints(vec![Constraint::Percentage(20), Constraint::Percentage(10), Constraint::Percentage(70)])
             .split(frame.area());
 
         if self.ensemble.is_some() {
@@ -208,13 +219,22 @@ impl App {
                 layout[0],
             );
 
-            self.render_table(frame, layout[1]);
+            self.render_table(frame, layout[2]);
         } else {
             let status_text = Line::from("Starting Up");
 
             frame.render_widget(
                 Paragraph::new(status_text).centered().block(top_block),
                 layout[0],
+            );
+        }
+
+        if self.label.is_some() {
+            let label_text = Line::from(self.label.as_ref().unwrap().as_str());
+
+            frame.render_widget(
+                Paragraph::new(label_text).block(dls_block),
+                layout[1],
             );
         }
     }

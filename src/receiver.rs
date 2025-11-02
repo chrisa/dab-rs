@@ -76,7 +76,7 @@ impl DABReceiver {
                     })
                     .expect("sending service to app");
 
-                let pad = pad::new_padstate();
+                let mut pad = pad::new_padstate();
                 let mut mpeg = mpeg::new_mpeg();
                 mpeg.init();
 
@@ -110,10 +110,15 @@ impl DABReceiver {
                     }
 
                     if let Some(main) = msc.try_buffer(&buffer) {
-                        // if let Ok(label) = pad.output(&main)
-                        //     && label.is_new {
-                        //         eprintln!("DLS: {}", label.label);
-                        //     }
+                        if let Ok(dls) = pad.output(&main) {
+                            // && dls.is_new {
+                            ui_tx
+                                .send(UiEvent {
+                                    data: EventData::Label(dls.label),
+                                })
+                                .expect("sending DLS to app");
+                                // eprintln!("DLS: {}", label.label);
+                            }
                         mpeg.output(&main);
                     }
                 }
