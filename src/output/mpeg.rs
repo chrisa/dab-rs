@@ -61,11 +61,10 @@ fn interleave_planar_f32(buf: &AudioBuffer<f32>) -> Vec<f32> {
 }
 
 impl Mpeg {
-    pub fn init(&mut self) {
-        // Set hardware parameters: 48000 Hz / Mono / 16 bit
+    pub fn init(&mut self, channels: u32, rate: u32) {
         let hwp = HwParams::any(&self.pcm).unwrap();
-        hwp.set_channels(2).unwrap();
-        hwp.set_rate(48000, ValueOr::Nearest).unwrap();
+        hwp.set_channels(channels).unwrap();
+        hwp.set_rate(rate, ValueOr::Nearest).unwrap();
         hwp.set_format(Format::FloatLE).unwrap();
         hwp.set_access(Access::RWInterleaved).unwrap();
         self.pcm.hw_params(&hwp).unwrap();
@@ -78,9 +77,12 @@ impl Mpeg {
         self.pcm.sw_params(&swp).unwrap();
     }
 
+    pub fn deinit(&mut self) {
+        self.header_expected = true;
+    }
+
     pub fn output(&mut self, frame: &MainServiceChannelFrame) {
         if self.header_expected {
-            self.header_valid = true;
             let header_bytes = frame.bits[0..4].try_into().expect("four bytes");
             let header_int = u32::from_be_bytes(header_bytes);
             let header = Mp2Header::from_u32(header_int);
@@ -88,7 +90,6 @@ impl Mpeg {
                 // eprintln!("header mask check failed: {:x}", header_int);
                 self.header_valid = false;
             } else if !header.id {
-                self.header_expected = false;
                 if LBRTAB[header.bit_rate_index as usize] != frame.bitrate as i16 {
                     // eprintln!(
                     //     "Low bitrate conflict FIC: {} MP2 header: {}",
@@ -102,12 +103,26 @@ impl Mpeg {
                 //     frame.bitrate, BRTAB[header.bit_rate_index as usize]
                 // );
                 self.header_valid = false;
+            } else {
+                self.header_expected = false;
+                self.header_valid = true;
+                let channels = match header.mode {
+                    0 => 2, // stereo
+                    1 => 2, // joint_stereo
+                    2 => 2, // dual_channel
+                    3 => 1, // single_channel
+                    _ => panic!("unexpected mp2 mode"),
+                };
+                let rate = match header.id {
+                    false => 24000,
+                    true  => 48000,
+                };
+                self.init(channels, rate);
             }
-        } else {
-            self.header_expected = true;
         }
 
         if self.header_valid {
+
             // Wrap your frame bytes in a Packet
             let packet = Packet::new_from_slice(0, 0, 0, &frame.bits);
 

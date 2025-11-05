@@ -14,7 +14,7 @@ use std::time::Duration;
 use color_eyre::Result;
 use dab::fic::ensemble::{Ensemble, Service};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, poll};
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::symbols::border;
 use ratatui::text::{Line, Text};
@@ -126,7 +126,7 @@ impl App {
             KeyCode::Char('j') | KeyCode::Down => self.next_row(),
             KeyCode::Char('k') | KeyCode::Up => self.previous_row(),
             KeyCode::Enter => self.select_service(),
-            _ => return,
+            _ => (),
          }
     }
 
@@ -229,13 +229,15 @@ impl App {
             );
         }
 
-        if self.label.is_some() {
-            let label_text = Line::from(self.label.as_ref().unwrap().as_str());
+        if let Some(label) = &self.label {
+            let paragraph = Paragraph::new(
+                Line::from(label.to_string())
+            ).alignment(Alignment::Left);
 
             frame.render_widget(
-                Paragraph::new(label_text).block(dls_block),
-                layout[1],
-            );
+                paragraph.block(dls_block),
+                layout[1]
+            )
         }
     }
 

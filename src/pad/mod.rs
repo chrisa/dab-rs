@@ -232,7 +232,7 @@ impl PadState {
                     self.firstlast = dls.firstlast;
 
                     if self.segnum == 0 {
-                        self.label = [0; 128];
+                        self.label = [0; LABEL_MAX];
                         self.label_offset = 0;
                     }
                 }
@@ -254,9 +254,10 @@ impl PadState {
                     self.label_offset += self.seglen;
 
                     if self.firstlast == FirstLast::Last {
+                        let label_string = String::from_utf8_lossy(&self.label[0..self.label_offset]).to_string();
                         return Ok(Label {
                             is_new: self.is_new,
-                            label: String::from_utf8_lossy(&self.label).to_string(),
+                            label: label_string,
                         });
                     }
                 }

@@ -78,7 +78,6 @@ impl DABReceiver {
 
                 let mut pad = pad::new_padstate();
                 let mut mpeg = mpeg::new_mpeg();
-                mpeg.init();
 
                 'msc: while let Ok(buffer) = source_rx.recv() {
                     if buffer.last {
@@ -99,6 +98,7 @@ impl DABReceiver {
                                 if let Some(service) = ens.find_service_by_id(service_id) {
                                     msc = new_channel(service);
                                     source.as_mut().select_channel(&msc);
+                                    mpeg.deinit();
                                 }
                             }
                             _ => todo!(),
