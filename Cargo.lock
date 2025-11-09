@@ -111,6 +111,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.100"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a23eb6b1614318a8071c9b2521f36b424b2c83db5eb3a0fead4a6c0809af6e61"
+
+[[package]]
 name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -485,6 +491,7 @@ name = "dab"
 version = "0.1.0"
 dependencies = [
  "alsa",
+ "anyhow",
  "bindgen",
  "bitvec",
  "cc",
@@ -498,6 +505,7 @@ dependencies = [
  "pretty-hex",
  "rand",
  "ratatui",
+ "reed_solomon_rs",
  "rustfft",
  "symphonia",
 ]
@@ -1143,6 +1151,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "reed_solomon_rs"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eda594c9644675fd614f01dc04593fc6a07fdc270b38e76a97551afa9a4e64eb"
+dependencies = [
+ "once_cell",
+ "serde",
+]
+
+[[package]]
 name = "regex"
 version = "1.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1392,6 +1410,7 @@ checksum = "5773a4c030a19d9bfaa090f49746ff35c75dfddfa700df7a5939d5e076a57039"
 dependencies = [
  "lazy_static",
  "symphonia-bundle-mp3",
+ "symphonia-codec-aac",
  "symphonia-core",
  "symphonia-metadata",
 ]
@@ -1406,6 +1425,17 @@ dependencies = [
  "log",
  "symphonia-core",
  "symphonia-metadata",
+]
+
+[[package]]
+name = "symphonia-codec-aac"
+version = "0.5.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c263845aa86881416849c1729a54c7f55164f8b96111dba59de46849e73a790"
+dependencies = [
+ "lazy_static",
+ "log",
+ "symphonia-core",
 ]
 
 [[package]]

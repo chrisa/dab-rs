@@ -5,7 +5,7 @@ use crate::{
         Bit, Viterbi, bit_reverse, bits_to_bytes, bytes_to_bits, qpsk_symbol_demapper, scramble,
     },
     fic::ensemble::{Protection, SubChannel, SubChannelType},
-    msc::{Buffers, ChannelSymbols, MainServiceChannelBuffer, SizedBuffer, tables::PVEC},
+    msc::{Buffers, ChannelSymbols, MainServiceChannelBuffer, SizedBuffer, tables::{EEP2A8, PVEC}},
     new_viterbi,
     wavefinder::Buffer,
 };
@@ -61,7 +61,11 @@ impl MainServiceChannelDecoder {
 
         let vited = self.viterbi.viterbi(&depunctured);
         let scrambled = scramble(&vited);
-        bits_to_bytes(&scrambled)
+        let bytes = bits_to_bytes(&scrambled);
+
+        // eprintln!("bytes len: {}", bytes.len());
+
+        bytes
     }
 
     fn time_disinterleave<const N: usize>(
@@ -91,7 +95,7 @@ impl MainServiceChannelDecoder {
         result
     }
 
-    fn eep_depuncture(&self, _bits: &[u8], _sc: &dyn SubChannel) -> Vec<Bit> {
+    fn eep_depuncture_data(&self, _bits: &[u8], _sc: &dyn SubChannel) -> Vec<Bit> {
         // println!("eep got bits of len {}", bits.len());
         Vec::new()
     }
@@ -105,7 +109,6 @@ impl MainServiceChannelDecoder {
         };
 
         let mut result: Vec<Bit> = Vec::with_capacity(4 * bits.len());
-
         let mut iter = bits.iter();
 
         for indx in 0..4 {
@@ -129,8 +132,42 @@ impl MainServiceChannelDecoder {
         result
     }
 
-    fn eep_depuncture_data(&self, _bits: &[u8], _sc: &dyn SubChannel) -> Vec<Bit> {
-        // println!("eep data got bits of len {}", bits.len());
-        Vec::new()
+    fn eep_depuncture(&self, bits: &[u8], sc: &dyn SubChannel) -> Vec<Bit> {
+        const BLKSIZE: usize = 128;
+
+        let eep = if sc.bitrate() == 8 && sc.protlvl() == 1 {
+            EEP2A8
+        } else {
+            match sc.eep_profile() {
+                Some(p) => p,
+                None => panic!("no EEP profile while eep_depuncturing?"),
+            }
+        };
+
+        let n: i16 = sc.size() as i16 / eep.sizemul as i16;
+        assert!(n >= 3);
+
+        let mut result: Vec<Bit> = Vec::with_capacity(4 * bits.len());
+        let mut iter = bits.iter();
+
+        for indx in 0..2 {
+            for i in 0..(BLKSIZE * ((eep.l[indx].mul as usize * n as usize) + eep.l[indx].offset as usize)) {
+                if PVEC[eep.pi[indx]][i % 32] == 1 {
+                    result.push(Bit::from_u8(iter.next().unwrap()));
+                } else {
+                    result.push(Bit::Erased);
+                }
+            }
+        }
+
+        for i in 0..24 {
+            if PVEC[7][i % 32] == 1 {
+                result.push(Bit::from_u8(iter.next().unwrap()));
+            } else {
+                result.push(Bit::Erased);
+            }
+        }
+
+        result
     }
 }

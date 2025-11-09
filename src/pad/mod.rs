@@ -31,10 +31,10 @@ pub struct PadState {
     is_new: bool,
 }
 
-pub fn new_padstate() -> PadState {
+pub fn new_padstate(sampling_freq: i32) -> PadState {
     PadState {
         bitrate: 0,
-        sampling_freq: 0,
+        sampling_freq: sampling_freq,
         seglen: 0,
         ci: 0,
         toggle: false,

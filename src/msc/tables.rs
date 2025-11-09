@@ -525,6 +525,83 @@ pub const UEPTABLE: &[UepProf] = &[
     },
 ];
 
+#[derive(Debug, Clone, Copy)]
+pub struct EepProf {
+    pub sizemul: u16,
+    pub ratemul: u16,
+    pub l: [EepProfL; 2],
+    pub pi: [usize; 2],
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct EepProfL {
+    pub mul: i16,
+    pub offset: i16,
+}
+
+pub const EEPTABLE: &[[EepProf; 4]; 2] = &[
+    [
+        EepProf {
+            sizemul: 12,
+            ratemul: 8,
+            l: [EepProfL { mul: 6, offset: -3 }, EepProfL { mul: 0, offset: 3 }],
+            pi: [23, 22],
+        },
+        EepProf {
+            sizemul: 8,
+            ratemul: 8,
+            l: [EepProfL { mul: 2, offset: -3 }, EepProfL { mul: 4, offset: 3 }],
+            pi: [13, 12],
+        },
+        EepProf {
+            sizemul: 6,
+            ratemul: 8,
+            l: [EepProfL { mul: 6, offset: -3 }, EepProfL { mul: 0, offset: 3 }],
+            pi: [7, 6],
+        },
+        EepProf {
+            sizemul: 4,
+            ratemul: 8,
+            l: [EepProfL { mul: 4, offset: -3 }, EepProfL { mul: 2, offset: 3 }],
+            pi: [2, 1],
+        },
+    ],
+    [
+        EepProf {
+            sizemul: 27,
+            ratemul: 32,
+            l: [EepProfL { mul: 24, offset: -3 }, EepProfL { mul: 0, offset: 3 }],
+            pi: [9, 8],
+        },
+        EepProf {
+            sizemul: 21,
+            ratemul: 32,
+            l: [EepProfL { mul: 24, offset: -3 }, EepProfL { mul: 0, offset: 3 }],
+            pi: [5, 4],
+        },
+        EepProf {
+            sizemul: 18,
+            ratemul: 32,
+            l: [EepProfL { mul: 24, offset: -3 }, EepProfL { mul: 0, offset: 3 }],
+            pi: [3, 2],
+        },
+        EepProf {
+            sizemul: 15,
+            ratemul: 32,
+            l: [EepProfL { mul: 24, offset: -3 }, EepProfL { mul: 0, offset: 3 }],
+            pi: [1, 0],
+        },
+    ]
+];
+
+pub const EEP2A8: EepProf = EepProf {
+    sizemul: 8,
+    ratemul: 8,
+    l: [EepProfL { mul: 0, offset: 5 }, EepProfL { mul: 0, offset: 1 }],
+    pi: [3, 12]
+};
+
+
 pub const PVEC: &[[u8; 32]] = &[
     [
         1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0,

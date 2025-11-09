@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use super::fig::{Fig, FigType, Information, LabelPurpose, ServiceComponent};
 
-use crate::msc::tables::{UEPTABLE, UepProf};
+use crate::msc::tables::{EEPTABLE, EepProf, UEPTABLE, UepProf};
 
 #[derive(Clone)]
 pub struct Ensemble {
@@ -30,9 +30,11 @@ pub struct AudioSubChannel {
     start: u16,
     bitrate: u16,
     size: u16,
-    protlvl: u8,
+    protlvl: usize,
+    opt: usize,
     prot: Protection,
     uep_index: usize,
+    audio_type: AudioSubChannelType,
 }
 
 #[derive(Clone, Debug)]
@@ -42,8 +44,8 @@ pub struct DataSubChannel {
     primary: bool,
     start: u16,
     size: u16,
-    protlvl: u8,
-    opt: u8,
+    protlvl: usize,
+    opt: usize,
     scca_flag: u8,
     dg: u8,
     dscty: u8,
@@ -78,7 +80,7 @@ pub fn new_service(id: u32) -> Service {
     }
 }
 
-pub fn new_subchannel(id: u8, primary: bool) -> AudioSubChannel {
+pub fn new_subchannel(id: u8, primary: bool, ascty: u8) -> AudioSubChannel {
     AudioSubChannel {
         id,
         primary,
@@ -86,9 +88,22 @@ pub fn new_subchannel(id: u8, primary: bool) -> AudioSubChannel {
         bitrate: 0,
         size: 0,
         protlvl: 0,
+        opt: 0,
         prot: Protection::Unknown,
         uep_index: 0,
+        audio_type: match ascty {
+            0x00 => AudioSubChannelType::DAB,
+            0x3f => AudioSubChannelType::DABPlus,
+            _ => AudioSubChannelType::Unknown,
+        }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AudioSubChannelType {
+    DAB,
+    DABPlus,
+    Unknown,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -110,77 +125,6 @@ pub fn new_data_subchannel(id: u16, primary: bool) -> DataSubChannel {
         uep_index: 0,
     }
 }
-
-// static UEP: [(u16, u16, u8); 64] = [
-//     (32, 16, 5),
-//     (32, 21, 4),
-//     (32, 24, 3),
-//     (32, 29, 2),
-//     (32, 35, 1),
-//     (48, 24, 5),
-//     (48, 29, 4),
-//     (48, 35, 3),
-//     (48, 42, 2),
-//     (48, 52, 1),
-//     (56, 29, 5),
-//     (56, 35, 4),
-//     (56, 42, 3),
-//     (56, 52, 2),
-//     (64, 32, 5),
-//     (64, 42, 4),
-//     (64, 48, 3),
-//     (64, 58, 2),
-//     (64, 70, 1),
-//     (80, 40, 5),
-//     (80, 52, 4),
-//     (80, 58, 3),
-//     (80, 70, 2),
-//     (80, 84, 1),
-//     (96, 48, 5),
-//     (96, 58, 4),
-//     (96, 70, 3),
-//     (96, 84, 2),
-//     (96, 104, 1),
-//     (112, 58, 5),
-//     (112, 70, 4),
-//     (112, 84, 3),
-//     (112, 104, 2),
-//     (128, 64, 5),
-//     (128, 84, 4),
-//     (128, 96, 3),
-//     (128, 116, 2),
-//     (128, 140, 1),
-//     (160, 80, 5),
-//     (160, 104, 4),
-//     (160, 116, 3),
-//     (160, 140, 2),
-//     (160, 168, 1),
-//     (192, 96, 5),
-//     (192, 116, 4),
-//     (192, 140, 3),
-//     (192, 168, 2),
-//     (192, 208, 1),
-//     (224, 116, 5),
-//     (224, 140, 4),
-//     (224, 168, 3),
-//     (224, 208, 2),
-//     (224, 232, 1),
-//     (256, 128, 5),
-//     (256, 168, 4),
-//     (256, 192, 3),
-//     (256, 232, 2),
-//     (256, 280, 1),
-//     (320, 160, 5),
-//     (320, 208, 4),
-//     (320, 280, 2),
-//     (384, 192, 5),
-//     (384, 280, 3),
-//     (384, 416, 1),
-// ];
-
-// fn service_name_matches(a: &str, b: &str) -> bool {
-//     a.trim_end() == b
-// }
 
 impl Ensemble {
     pub fn is_complete(&mut self) -> bool {
@@ -283,10 +227,10 @@ impl Ensemble {
                             self.add_service(new_service(SId));
                             for component in components {
                                 match component {
-                                    ServiceComponent::StreamAudio { SubChId, PS, .. } => self
+                                    ServiceComponent::StreamAudio { SubChId, PS, ASCTy, .. } => self
                                         .add_service_subchannel(
                                             SId,
-                                            new_subchannel(SubChId, PS != 0),
+                                            new_subchannel(SubChId, PS != 0, ASCTy),
                                         ),
                                     ServiceComponent::PacketData { SCId, PS, .. } => self
                                         .add_service_data_subchannel(
@@ -327,12 +271,19 @@ impl Ensemble {
                             ProtLvl,
                             SubChSz,
                         } => {
+                            let profile = EEPTABLE[Opt as usize][ProtLvl as usize];
+                            let bitrate = match Opt {
+                                0 => profile.sizemul * 8,
+                                1 => profile.sizemul * 32,
+                                u => panic!("unexpected EEP Opt value: {}", u),
+                            };
+
                             if let Some(SId) = self.find_service_for_subchannel(SubChId) {
                                 self.set_service_subchannel_info(
                                     SId,
                                     SubChId,
                                     StartAddr,
-                                    0,
+                                    bitrate,
                                     SubChSz,
                                     ProtLvl,
                                     Opt,
@@ -428,7 +379,8 @@ impl Ensemble {
                 subchannel.start = start;
                 subchannel.bitrate = bitrate;
                 subchannel.size = size;
-                subchannel.protlvl = protlvl;
+                subchannel.protlvl = protlvl as usize;
+                subchannel.opt = opt as usize;
                 subchannel.prot = prot;
                 subchannel.uep_index = uep_index;
                 return;
@@ -437,8 +389,8 @@ impl Ensemble {
                 if data_subchannel.subchid == subchannel_id {
                     data_subchannel.start = start;
                     data_subchannel.size = size;
-                    data_subchannel.protlvl = protlvl;
-                    data_subchannel.opt = opt;
+                    data_subchannel.protlvl = protlvl as usize;
+                    data_subchannel.opt = opt as usize;
                     data_subchannel.prot = prot;
                     data_subchannel.uep_index = uep_index;
                     return;
@@ -528,7 +480,11 @@ pub trait SubChannel {
     fn protection(&self) -> Protection;
     fn subchannel_type(&self) -> SubChannelType;
     fn uep_profile(&self) -> Option<UepProf>;
+    fn eep_profile(&self) -> Option<EepProf>;
     fn bitrate(&self) -> u16;
+    fn audio_type(&self) -> AudioSubChannelType;
+    fn protlvl(&self) -> usize;
+    fn opt(&self) -> usize;
     // fn as_any(&self) -> &dyn Any;
 }
 
@@ -551,8 +507,23 @@ impl SubChannel for AudioSubChannel {
         }
         None
     }
+    fn eep_profile(&self) -> Option<EepProf> {
+        if self.prot == Protection::EEP {
+            return Some(EEPTABLE[self.opt][self.protlvl]);
+        }
+        None
+    }
     fn bitrate(&self) -> u16 {
         self.bitrate
+    }
+    fn audio_type(&self) -> AudioSubChannelType {
+        self.audio_type
+    }
+    fn protlvl(&self) -> usize {
+        self.protlvl
+    }
+    fn opt(&self) -> usize {
+        self.opt
     }
     // fn as_any(&self) -> &dyn Any {
     //     self
@@ -573,13 +544,22 @@ impl SubChannel for DataSubChannel {
         SubChannelType::Data
     }
     fn uep_profile(&self) -> Option<UepProf> {
-        if self.prot == Protection::UEP {
-            return Some(UEPTABLE[self.uep_index]);
-        }
+        None
+    }
+    fn eep_profile(&self) -> Option<EepProf> {
         None
     }
     fn bitrate(&self) -> u16 {
         0
+    }
+    fn audio_type(&self) -> AudioSubChannelType {
+        AudioSubChannelType::Unknown
+    }
+    fn protlvl(&self) -> usize {
+        self.protlvl
+    }
+    fn opt(&self) -> usize {
+        self.opt
     }
     // fn as_any(&self) -> &dyn Any {
     //     self

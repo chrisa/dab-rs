@@ -8,11 +8,11 @@
 
 use std::io;
 use std::sync::mpsc::{Receiver, Sender};
-use std::thread::JoinHandle;
+use std::thread::{JoinHandle, sleep_ms};
 use std::time::Duration;
 
 use color_eyre::Result;
-use dab::fic::ensemble::{Ensemble, Service};
+use dab::fic::ensemble::{AudioSubChannelType, Ensemble, Service};
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, poll};
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
@@ -37,25 +37,31 @@ struct App {
 
 fn main() -> Result<()> {
     let args = Cli::parse();
-    color_eyre::install()?;
-    let terminal = ratatui::init();
+    // color_eyre::install()?;
+    // let terminal = ratatui::init();
 
     let mut receiver = new_receiver(args);
     let (ui_rx, control_tx, receiver_t) = receiver.run();
 
-    let mut app = App {
-        ui_rx,
-        control_tx,
-        ensemble: None,
-        service: None,
-        label: None,
-        exit: false,
-        tablestate: TableState::default().with_selected(0),
-    };
-    let result = app.run(terminal, receiver_t);
+    // let mut app = App {
+    //     ui_rx,
+    //     control_tx,
+    //     ensemble: None,
+    //     service: None,
+    //     label: None,
+    //     exit: false,
+    //     tablestate: TableState::default().with_selected(0),
+    // };
+    // let result = app.run(terminal, receiver_t);
 
-    ratatui::restore();
-    result
+    // ratatui::restore();
+    // result
+
+    loop {
+        sleep_ms(1000);
+    }
+
+    Ok(())
 }
 
 impl App {
@@ -244,7 +250,7 @@ impl App {
     fn render_table(&mut self, frame: &mut Frame, area: Rect) {
         let ensemble = self.ensemble.as_ref().unwrap();
 
-        let header = ["Ensemble", "Label", "Id", "Bitrate", "Type"]
+        let header = ["Ensemble", "Label", "Id", "Bitrate", "Type", "Audio"]
             .into_iter()
             .map(Cell::from)
             .collect::<Row>()
@@ -267,6 +273,11 @@ impl App {
                         "{:?}",
                         service.subchannel().subchannel_type()
                     ))),
+                    Cell::from(Text::from(match service.subchannel().audio_type() {
+                        AudioSubChannelType::DAB => "DAB",
+                        AudioSubChannelType::DABPlus => "DAB+",
+                        _ => ""
+                    }))
                 ]
                 .into_iter()
                 .collect::<Row>()
@@ -288,7 +299,8 @@ impl App {
                 Constraint::Length(18),
                 Constraint::Length(4),
                 Constraint::Length(7),
-                Constraint::Length(20),
+                Constraint::Length(6),
+                Constraint::Length(5),
             ],
         )
         .header(header)

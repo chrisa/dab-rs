@@ -1,3 +1,4 @@
+use crate::output::AudioOutput;
 use crate::{msc::MainServiceChannelFrame, output::mp2header::Mp2Header};
 use alsa::pcm::{Access, Format, HwParams, PCM};
 use alsa::{Direction, ValueOr};
@@ -60,8 +61,8 @@ fn interleave_planar_f32(buf: &AudioBuffer<f32>) -> Vec<f32> {
     out
 }
 
-impl Mpeg {
-    pub fn init(&mut self, channels: u32, rate: u32) {
+impl AudioOutput for Mpeg {
+    fn init(&mut self, channels: u32, rate: u32) {
         let hwp = HwParams::any(&self.pcm).unwrap();
         hwp.set_channels(channels).unwrap();
         hwp.set_rate(rate, ValueOr::Nearest).unwrap();
@@ -77,11 +78,11 @@ impl Mpeg {
         self.pcm.sw_params(&swp).unwrap();
     }
 
-    pub fn deinit(&mut self) {
+    fn deinit(&mut self) {
         self.header_expected = true;
     }
 
-    pub fn output(&mut self, frame: &MainServiceChannelFrame) {
+    fn output(&mut self, frame: &MainServiceChannelFrame) {
         if self.header_expected {
             let header_bytes = frame.bits[0..4].try_into().expect("four bytes");
             let header_int = u32::from_be_bytes(header_bytes);

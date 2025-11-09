@@ -2,7 +2,10 @@ use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 use std::thread::JoinHandle;
 
+use crate::fic::ensemble::AudioSubChannelType;
+use crate::output::AudioOutput;
 use crate::output::mpeg::{self};
+use crate::output::aac::{self};
 use crate::{Cli, CliSource, ControlEvent, UiEvent};
 use crate::{ControlData, EventData, pad};
 use crate::{
@@ -54,6 +57,7 @@ impl DABReceiver {
                         }
                     }
                     if ens.is_complete() {
+                        ens.display();
                         break;
                     }
                 }
@@ -76,8 +80,12 @@ impl DABReceiver {
                     })
                     .expect("sending service to app");
 
-                let mut pad = pad::new_padstate();
-                let mut mpeg = mpeg::new_mpeg();
+                // let mut pad = pad::new_padstate(service.subchannel().sampling_freq());
+                let mut audio: Box<dyn AudioOutput> = match service.subchannel().audio_type() {
+                    AudioSubChannelType::DAB => Box::new(mpeg::new_mpeg()),
+                    AudioSubChannelType::DABPlus => Box::new(aac::new_aac()),
+                    AudioSubChannelType::Unknown => panic!("unknown audio type"),
+                };
 
                 'msc: while let Ok(buffer) = source_rx.recv() {
                     if buffer.last {
@@ -98,7 +106,7 @@ impl DABReceiver {
                                 if let Some(service) = ens.find_service_by_id(service_id) {
                                     msc = new_channel(service);
                                     source.as_mut().select_channel(&msc);
-                                    mpeg.deinit();
+                                    audio.deinit();
                                 }
                             }
                             _ => todo!(),
@@ -110,16 +118,16 @@ impl DABReceiver {
                     }
 
                     if let Some(main) = msc.try_buffer(&buffer) {
-                        if let Ok(dls) = pad.output(&main) {
-                            // && dls.is_new {
-                            ui_tx
-                                .send(UiEvent {
-                                    data: EventData::Label(dls.label),
-                                })
-                                .expect("sending DLS to app");
-                                // eprintln!("DLS: {}", label.label);
-                            }
-                        mpeg.output(&main);
+                        // if let Ok(dls) = pad.output(&main) {
+                        //     // && dls.is_new {
+                        //     ui_tx
+                        //         .send(UiEvent {
+                        //             data: EventData::Label(dls.label),
+                        //         })
+                        //         .expect("sending DLS to app");
+                        //         // eprintln!("DLS: {}", label.label);
+                        //     }
+                        audio.output(&main);
                     }
                 }
 

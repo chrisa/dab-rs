@@ -1,3 +1,4 @@
+use crate::fic::ensemble::Protection;
 use crate::msc::decoder::{MainServiceChannelDecoder, new_decoder};
 use crate::{fic::ensemble::Service, wavefinder::Buffer};
 use bitvec::prelude::*;
@@ -220,10 +221,11 @@ impl<'a> MainServiceChannel<'a> {
     }
 
     fn decode(&self) -> MainServiceChannelFrame {
+        let sc = self.service.subchannel();
         let bits = self
             .decoder
-            .decode(&self.buffers, self.service.subchannel(), &self.symbols);
-        let bitrate = self.service.subchannel().bitrate();
+            .decode(&self.buffers, sc, &self.symbols);
+        let bitrate = sc.bitrate();
         MainServiceChannelFrame {
             frame: self.cur_frame,
             bitrate,
