@@ -100,7 +100,7 @@ enum XPadInd {
     NoXPad = 0,
     ShortXPad = 1,
     VariableXPad = 2,
-    _Reserved = 3,
+    Reserved = 3,
 }
 
 impl XPadInd {
@@ -109,7 +109,8 @@ impl XPadInd {
             0 => Self::NoXPad,
             1 => Self::ShortXPad,
             2 => Self::VariableXPad,
-            u => panic!("unexpected XPadInd: {}", u),
+            3 => Self::Reserved,
+            u => panic!("really unexpected XPadInd: {}", u),
         }
     }
 }
