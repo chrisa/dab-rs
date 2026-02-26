@@ -12,8 +12,6 @@ use crate::wavefinder::Message;
 use crate::wavefinder::mem_write_msg;
 use crate::wavefinder::timing_msg;
 
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
 use std::time::{Duration, SystemTime};
 
 pub struct PhaseReferenceSynchroniser {
@@ -26,10 +24,10 @@ pub struct PhaseReferenceSynchroniser {
     ravg: RAverage,
     selstr: [u8; 10],
     count: i32,
-    locked: &'static AtomicBool,
+    locked: bool,
 }
 
-pub fn new_synchroniser(locked: &'static AtomicBool) -> PhaseReferenceSynchroniser {
+pub fn new_synchroniser() -> PhaseReferenceSynchroniser {
     let (prs1, prs2) = prs_reference_1_2();
     PhaseReferenceSynchroniser {
         prs1,
@@ -41,7 +39,7 @@ pub fn new_synchroniser(locked: &'static AtomicBool) -> PhaseReferenceSynchronis
         ravg: new_raverage(),
         selstr: [0xff; 10],
         count: 0,
-        locked,
+        locked: false,
     }
 }
 
@@ -74,8 +72,8 @@ impl PhaseReferenceSynchroniser {
         self.count
     }
 
-    fn locked(&self) -> bool {
-        self.locked.load(Ordering::Relaxed)
+    pub fn is_locked(&self) -> bool {
+        self.locked
     }
 
     fn lock(&mut self) -> bool {
@@ -84,14 +82,14 @@ impl PhaseReferenceSynchroniser {
             false
         } else {
             self.lock_count = 0;
-            self.locked.store(true, Ordering::Relaxed);
+            self.locked = true;
             true
         }
     }
 
     fn unlock(&mut self) {
         self.lock_count = 3;
-        self.locked.store(false, Ordering::Relaxed);
+        self.locked = false;
     }
 
     pub fn try_sync_prs(&mut self, prs: PhaseReferenceSymbol) -> Vec<Message> {
@@ -141,7 +139,7 @@ impl PhaseReferenceSynchroniser {
         let mut maxv = 0.0;
         let mut c = 4.8828125e-7;
 
-        let (count, mut prslocal) = if self.locked() {
+        let (count, mut prslocal) = if self.is_locked() {
             (1_usize, align_reference_symbol(0, &self.prs1))
         } else {
             (25, align_reference_symbol(12, &self.prs1))
@@ -166,7 +164,7 @@ impl PhaseReferenceSynchroniser {
                 max = 0.0;
             }
 
-            if self.locked() {
+            if self.is_locked() {
                 indx_n = peak(&magdata, indx);
                 indx_n /= 15;
 
@@ -191,7 +189,7 @@ impl PhaseReferenceSynchroniser {
             indxv = 2048 - indxv;
         }
 
-        if self.locked() {
+        if self.is_locked() {
             c *= indx_n as f64;
         } else {
             c *= indxv as f64;

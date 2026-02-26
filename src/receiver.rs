@@ -1,19 +1,15 @@
-use std::sync::atomic::{AtomicBool, Ordering};
-
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
 use tokio::task::JoinHandle;
 
 use crate::output::worker::AudioWorker;
 use crate::prs;
-use crate::prs::sync::new_synchroniser;
+use crate::prs::sync::{PhaseReferenceSynchroniser, new_synchroniser};
 use crate::source::{SourceControl, start_source};
 use crate::{Cli, ControlData, ControlEvent, EventData, UiEvent, pad};
 use crate::{
     fic::{FastInformationChannelBuffer, ensemble::new_ensemble},
     msc::new_channel,
 };
-
-static LOCKED: AtomicBool = AtomicBool::new(false);
 
 pub struct ReceiverRuntime {
     pub ui_rx: UnboundedReceiver<UiEvent>,
@@ -58,12 +54,10 @@ async fn run_receiver(
         frequency,
     } = args;
 
-    LOCKED.store(false, Ordering::Relaxed);
-
     let mut source_runtime = start_source(source, file, frequency);
     let mut fic_decoder = crate::fic::new_decoder();
     let mut ensemble = new_ensemble();
-    let mut synchroniser = new_synchroniser(&LOCKED);
+    let mut synchroniser = new_synchroniser();
     let mut prs_symbol = prs::new_symbol();
     let mut stop_requested = false;
 
@@ -94,7 +88,7 @@ async fn run_receiver(
 
                 sync_prs(&buffer, &mut prs_symbol, &mut synchroniser, &source_runtime.control);
 
-                if !LOCKED.load(Ordering::Relaxed) {
+                if !synchroniser.is_locked() {
                     continue;
                 }
 
@@ -139,13 +133,11 @@ async fn run_receiver(
             tokio::select! {
                 maybe_control = control_rx.recv() => {
                     let Some(control) = maybe_control else {
-                        stop_requested = true;
                         break 'msc;
                     };
 
                     match control.data {
                         ControlData::Stop() => {
-                            stop_requested = true;
                             break 'msc;
                         }
                         ControlData::Select(service_id) => {
@@ -172,7 +164,7 @@ async fn run_receiver(
 
                     sync_prs(&buffer, &mut prs_symbol, &mut synchroniser, &source_runtime.control);
 
-                    if !LOCKED.load(Ordering::Relaxed) {
+                    if !synchroniser.is_locked() {
                         continue;
                     }
 
@@ -191,16 +183,13 @@ async fn run_receiver(
         audio.shutdown().await;
     }
 
-    if stop_requested {
-        LOCKED.store(false, Ordering::Relaxed);
-    }
     source_runtime.control.shutdown().await;
 }
 
 fn sync_prs(
     buffer: &crate::wavefinder::Buffer,
     prs_symbol: &mut prs::PhaseReferenceSymbol,
-    synchroniser: &mut crate::prs::sync::PhaseReferenceSynchroniser,
+    synchroniser: &mut PhaseReferenceSynchroniser,
     source_control: &SourceControl,
 ) {
     prs_symbol.try_buffer(buffer);
