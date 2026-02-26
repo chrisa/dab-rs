@@ -1,18 +1,21 @@
+use std::sync::Arc;
+
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::sync::watch;
 use tokio::task::JoinHandle;
 
 use crate::output::worker::AudioWorker;
 use crate::prs;
 use crate::prs::sync::{PhaseReferenceSynchroniser, new_synchroniser};
 use crate::source::{SourceControl, start_source};
-use crate::{Cli, ControlData, ControlEvent, EventData, UiEvent, pad};
+use crate::{Cli, ControlData, ControlEvent, UiModel, pad};
 use crate::{
     fic::{FastInformationChannelBuffer, ensemble::new_ensemble},
     msc::new_channel,
 };
 
 pub struct ReceiverRuntime {
-    pub ui_rx: UnboundedReceiver<UiEvent>,
+    pub ui_rx: watch::Receiver<UiModel>,
     pub control_tx: UnboundedSender<ControlEvent>,
     pub task: JoinHandle<()>,
 }
@@ -27,7 +30,7 @@ pub fn new_receiver(args: Cli) -> DABReceiver {
 
 impl DABReceiver {
     pub fn run(self) -> ReceiverRuntime {
-        let (ui_tx, ui_rx) = unbounded_channel();
+        let (ui_tx, ui_rx) = watch::channel(UiModel::default());
         let (control_tx, control_rx) = unbounded_channel();
 
         let task = tokio::task::spawn_local(async move {
@@ -44,7 +47,7 @@ impl DABReceiver {
 
 async fn run_receiver(
     args: Cli,
-    ui_tx: UnboundedSender<UiEvent>,
+    ui_tx: watch::Sender<UiModel>,
     mut control_rx: UnboundedReceiver<ControlEvent>,
 ) {
     let Cli {
@@ -60,6 +63,7 @@ async fn run_receiver(
     let mut synchroniser = new_synchroniser();
     let mut prs_symbol = prs::new_symbol();
     let mut stop_requested = false;
+    let mut ui_model = UiModel::default();
 
     'fic: loop {
         tokio::select! {
@@ -114,17 +118,15 @@ async fn run_receiver(
         return;
     }
 
-    let _ = ui_tx.send(UiEvent {
-        data: EventData::Ensemble(ensemble.clone()),
-    });
+    ui_model.ensemble = Some(Arc::new(ensemble.clone()));
+    publish_ui(&ui_tx, &ui_model);
 
     if let Some(service) = ensemble.find_service_by_id_str(&service_id) {
         let mut msc = new_channel(service);
         synchroniser.select_channel(&msc);
 
-        let _ = ui_tx.send(UiEvent {
-            data: EventData::Service(service.clone()),
-        });
+        ui_model.service = Some(Arc::new(service.clone()));
+        publish_ui(&ui_tx, &ui_model);
 
         let mut pad = pad::new_padstate();
         let audio = AudioWorker::new();
@@ -145,9 +147,8 @@ async fn run_receiver(
                                 msc = new_channel(service);
                                 synchroniser.select_channel(&msc);
                                 audio.reset().await;
-                                let _ = ui_tx.send(UiEvent {
-                                    data: EventData::Service(service.clone()),
-                                });
+                                ui_model.service = Some(Arc::new(service.clone()));
+                                publish_ui(&ui_tx, &ui_model);
                             }
                         }
                         ControlData::Tune(_) => {}
@@ -170,9 +171,8 @@ async fn run_receiver(
 
                     if let Some(main) = msc.try_buffer(&buffer) {
                         if let Ok(dls) = pad.output(&main) {
-                            let _ = ui_tx.send(UiEvent {
-                                data: EventData::Label(dls.label),
-                            });
+                            ui_model.label = Some(dls.label);
+                            publish_ui(&ui_tx, &ui_model);
                         }
                         audio.try_send_frame(main);
                     }
@@ -184,6 +184,10 @@ async fn run_receiver(
     }
 
     source_runtime.control.shutdown().await;
+}
+
+fn publish_ui(ui_tx: &watch::Sender<UiModel>, ui_model: &UiModel) {
+    let _ = ui_tx.send(ui_model.clone());
 }
 
 fn sync_prs(

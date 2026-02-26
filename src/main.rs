@@ -6,6 +6,7 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::too_many_arguments)]
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use color_eyre::Result;
@@ -18,19 +19,19 @@ use ratatui::symbols::border;
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Cell, Paragraph, Row, Table, TableState};
 use ratatui::{DefaultTerminal, Frame};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::{mpsc::UnboundedSender, watch};
 use tokio::task::JoinHandle;
 
 use clap::Parser;
 use dab::receiver::new_receiver;
-use dab::{Cli, ControlData, ControlEvent, EventData, UiEvent};
+use dab::{Cli, ControlData, ControlEvent, UiModel};
 
 struct App {
     exit: bool,
     control_tx: UnboundedSender<ControlEvent>,
-    ui_rx: UnboundedReceiver<UiEvent>,
-    ensemble: Option<Ensemble>,
-    service: Option<Service>,
+    ui_rx: watch::Receiver<UiModel>,
+    ensemble: Option<Arc<Ensemble>>,
+    service: Option<Arc<Service>>,
     label: Option<String>,
     tablestate: TableState,
 }
@@ -84,9 +85,9 @@ impl App {
                         self.handle_key_event(key_event);
                     }
                 }
-                maybe_ui = self.ui_rx.recv() => {
-                    if let Some(event) = maybe_ui {
-                        self.handle_ui_event(event);
+                changed = self.ui_rx.changed() => {
+                    if changed.is_ok() {
+                        self.handle_ui_model();
                     }
                 }
                 _ = tick.tick() => {}
@@ -116,24 +117,16 @@ impl App {
         }
     }
 
-    fn handle_ui_event(&mut self, event: UiEvent) {
-        match event {
-            UiEvent {
-                data: EventData::Ensemble(ensemble),
-            } => {
-                self.ensemble = Some(ensemble);
-            }
-            UiEvent {
-                data: EventData::Service(service),
-            } => {
-                self.service = Some(service);
-                self.set_selected_service();
-            }
-            UiEvent {
-                data: EventData::Label(label),
-            } => {
-                self.label = Some(label);
-            }
+    fn handle_ui_model(&mut self) {
+        let previous_service = self.service.as_ref().map(|service| service.id);
+        let model = self.ui_rx.borrow_and_update().clone();
+        self.ensemble = model.ensemble;
+        self.service = model.service;
+        self.label = model.label;
+
+        let current_service = self.service.as_ref().map(|service| service.id);
+        if previous_service != current_service && current_service.is_some() {
+            self.set_selected_service();
         }
     }
 

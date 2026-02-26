@@ -1,4 +1,5 @@
 use clap::Parser;
+use std::sync::Arc;
 
 pub mod decode;
 pub mod fic;
@@ -15,14 +16,11 @@ pub use decode::new_viterbi;
 
 use crate::fic::ensemble::{Ensemble, Service};
 
-pub enum EventData {
-    Ensemble(Ensemble),
-    Service(Service),
-    Label(String),
-}
-
-pub struct UiEvent {
-    pub data: EventData,
+#[derive(Clone, Default)]
+pub struct UiModel {
+    pub ensemble: Option<Arc<Ensemble>>,
+    pub service: Option<Arc<Service>>,
+    pub label: Option<String>,
 }
 
 pub enum ControlData {
