@@ -255,7 +255,8 @@ impl PadState {
                     self.label_offset += self.seglen;
 
                     if self.firstlast == FirstLast::Last {
-                        let label_string = String::from_utf8_lossy(&self.label[0..self.label_offset]).to_string();
+                        let label_string =
+                            String::from_utf8_lossy(&self.label[0..self.label_offset]).to_string();
                         return Ok(Label {
                             is_new: self.is_new,
                             label: label_string,

@@ -1,14 +1,25 @@
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::thread;
-use std::thread::JoinHandle;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::output::mpeg::{self};
-use crate::{Cli, CliSource, ControlEvent, UiEvent};
-use crate::{ControlData, EventData, pad};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
+use tokio::task::JoinHandle;
+
+use crate::output::worker::AudioWorker;
+use crate::prs;
+use crate::prs::sync::new_synchroniser;
+use crate::source::{SourceControl, start_source};
+use crate::{Cli, ControlData, ControlEvent, EventData, UiEvent, pad};
 use crate::{
     fic::{FastInformationChannelBuffer, ensemble::new_ensemble},
     msc::new_channel,
 };
+
+static LOCKED: AtomicBool = AtomicBool::new(false);
+
+pub struct ReceiverRuntime {
+    pub ui_rx: UnboundedReceiver<UiEvent>,
+    pub control_tx: UnboundedSender<ControlEvent>,
+    pub task: JoinHandle<()>,
+}
 
 pub struct DABReceiver {
     args: Cli,
@@ -19,114 +30,184 @@ pub fn new_receiver(args: Cli) -> DABReceiver {
 }
 
 impl DABReceiver {
-    pub fn run(&mut self) -> (Receiver<UiEvent>, Sender<ControlEvent>, JoinHandle<()>) {
-        let mut source = match self.args.source {
-            CliSource::Wavefinder => crate::source::wavefinder::new_wavefinder_source(
-                self.args.file.clone(),
-                self.args.frequency.clone(),
-            ),
-            CliSource::File => crate::source::file::new_file_source(self.args.file.clone()),
-        };
+    pub fn run(self) -> ReceiverRuntime {
+        let (ui_tx, ui_rx) = unbounded_channel();
+        let (control_tx, control_rx) = unbounded_channel();
 
-        let (source_rx, source_t) = source.run();
+        let task = tokio::task::spawn_local(async move {
+            run_receiver(self.args, ui_tx, control_rx).await;
+        });
 
-        let (ui_tx, ui_rx) = mpsc::channel();
-        let (control_tx, control_rx) = mpsc::channel();
+        ReceiverRuntime {
+            ui_rx,
+            control_tx,
+            task,
+        }
+    }
+}
 
-        let mut fic_decoder = crate::fic::new_decoder();
-        let mut ens = new_ensemble();
-        let service_id = self.args.service.clone();
+async fn run_receiver(
+    args: Cli,
+    ui_tx: UnboundedSender<UiEvent>,
+    mut control_rx: UnboundedReceiver<ControlEvent>,
+) {
+    let Cli {
+        source,
+        service: service_id,
+        file,
+        frequency,
+    } = args;
 
-        let receiver_t = thread::spawn(move || {
-            // FIC
+    LOCKED.store(false, Ordering::Relaxed);
 
-            while let Ok(buffer) = source_rx.recv() {
-                if buffer.last {
-                    break;
+    let mut source_runtime = start_source(source, file, frequency);
+    let mut fic_decoder = crate::fic::new_decoder();
+    let mut ensemble = new_ensemble();
+    let mut synchroniser = new_synchroniser(&LOCKED);
+    let mut prs_symbol = prs::new_symbol();
+    let mut stop_requested = false;
+
+    'fic: loop {
+        tokio::select! {
+            maybe_control = control_rx.recv() => {
+                let Some(control) = maybe_control else {
+                    stop_requested = true;
+                    break 'fic;
+                };
+
+                if let ControlEvent {
+                    data: ControlData::Stop(),
+                } = control
+                {
+                    stop_requested = true;
+                    break 'fic;
                 }
+            }
+            maybe_buffer = source_runtime.buffers.recv() => {
+                let Some(buffer) = maybe_buffer else {
+                    break 'fic;
+                };
+
+                if buffer.last {
+                    break 'fic;
+                }
+
+                sync_prs(&buffer, &mut prs_symbol, &mut synchroniser, &source_runtime.control);
+
+                if !LOCKED.load(Ordering::Relaxed) {
+                    continue;
+                }
+
                 if let Ok(fic_buffer) = TryInto::<FastInformationChannelBuffer>::try_into(&buffer)
                     && let Some(fibs) = fic_decoder.try_buffer(fic_buffer)
                 {
                     for fib in fibs {
                         let figs = fic_decoder.extract_figs(&fib);
                         for fig in figs {
-                            ens.add_fig(fig);
+                            ensemble.add_fig(fig);
                         }
                     }
-                    if ens.is_complete() {
-                        break;
+                    if ensemble.is_complete() {
+                        break 'fic;
                     }
                 }
             }
+        }
+    }
 
-            ui_tx
-                .send(UiEvent {
-                    data: EventData::Ensemble(ens.clone()),
-                })
-                .expect("sending ensemble to app");
+    if stop_requested {
+        source_runtime.control.shutdown().await;
+        return;
+    }
 
-            // If service, MSC
-            if let Some(service) = ens.find_service_by_id_str(&service_id) {
-                let mut msc = new_channel(service);
-                source.as_mut().select_channel(&msc);
+    let _ = ui_tx.send(UiEvent {
+        data: EventData::Ensemble(ensemble.clone()),
+    });
 
-                ui_tx
-                    .send(UiEvent {
-                        data: EventData::Service(service.clone()),
-                    })
-                    .expect("sending service to app");
+    if let Some(service) = ensemble.find_service_by_id_str(&service_id) {
+        let mut msc = new_channel(service);
+        synchroniser.select_channel(&msc);
 
-                let mut pad = pad::new_padstate();
-                let mut mpeg = mpeg::new_mpeg();
+        let _ = ui_tx.send(UiEvent {
+            data: EventData::Service(service.clone()),
+        });
 
-                'msc: while let Ok(buffer) = source_rx.recv() {
-                    if buffer.last {
-                        break;
-                    }
+        let mut pad = pad::new_padstate();
+        let audio = AudioWorker::new();
 
-                    if let Ok(msg) = control_rx.try_recv() {
-                        match msg {
-                            ControlEvent {
-                                data: ControlData::Stop(),
-                            } => {
-                                source.exit();
-                                break 'msc;
-                            },
-                            ControlEvent {
-                                data: ControlData::Select(service_id),
-                            } => {
-                                if let Some(service) = ens.find_service_by_id(service_id) {
-                                    msc = new_channel(service);
-                                    source.as_mut().select_channel(&msc);
-                                    mpeg.deinit();
-                                }
-                            }
-                            _ => todo!(),
+        'msc: loop {
+            tokio::select! {
+                maybe_control = control_rx.recv() => {
+                    let Some(control) = maybe_control else {
+                        stop_requested = true;
+                        break 'msc;
+                    };
+
+                    match control.data {
+                        ControlData::Stop() => {
+                            stop_requested = true;
+                            break 'msc;
                         }
+                        ControlData::Select(service_id) => {
+                            if let Some(service) = ensemble.find_service_by_id(service_id) {
+                                msc = new_channel(service);
+                                synchroniser.select_channel(&msc);
+                                audio.reset().await;
+                                let _ = ui_tx.send(UiEvent {
+                                    data: EventData::Service(service.clone()),
+                                });
+                            }
+                        }
+                        ControlData::Tune(_) => {}
+                    }
+                }
+                maybe_buffer = source_runtime.buffers.recv() => {
+                    let Some(buffer) = maybe_buffer else {
+                        break 'msc;
+                    };
+
+                    if buffer.last {
+                        break 'msc;
                     }
 
-                    if !source.as_ref().ready() {
+                    sync_prs(&buffer, &mut prs_symbol, &mut synchroniser, &source_runtime.control);
+
+                    if !LOCKED.load(Ordering::Relaxed) {
                         continue;
                     }
 
                     if let Some(main) = msc.try_buffer(&buffer) {
                         if let Ok(dls) = pad.output(&main) {
-                            // && dls.is_new {
-                            ui_tx
-                                .send(UiEvent {
-                                    data: EventData::Label(dls.label),
-                                })
-                                .expect("sending DLS to app");
-                                // eprintln!("DLS: {}", label.label);
-                            }
-                        mpeg.output(&main);
+                            let _ = ui_tx.send(UiEvent {
+                                data: EventData::Label(dls.label),
+                            });
+                        }
+                        audio.try_send_frame(main);
                     }
                 }
-
-                source_t.join().unwrap();
             }
-        });
+        }
 
-        (ui_rx, control_tx, receiver_t)
+        audio.shutdown().await;
+    }
+
+    if stop_requested {
+        LOCKED.store(false, Ordering::Relaxed);
+    }
+    source_runtime.control.shutdown().await;
+}
+
+fn sync_prs(
+    buffer: &crate::wavefinder::Buffer,
+    prs_symbol: &mut prs::PhaseReferenceSymbol,
+    synchroniser: &mut crate::prs::sync::PhaseReferenceSynchroniser,
+    source_control: &SourceControl,
+) {
+    prs_symbol.try_buffer(buffer);
+    if prs_symbol.is_complete() {
+        let complete_prs = std::mem::replace(prs_symbol, prs::new_symbol());
+        for message in synchroniser.try_sync_prs(complete_prs) {
+            source_control.send_wavefinder_message(message);
+        }
     }
 }

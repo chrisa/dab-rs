@@ -1,81 +1,74 @@
-use std::{
-    fs::File,
-    io::BufReader,
-    path::PathBuf,
-    sync::{
-        Arc, Mutex,
-        mpsc::{self, Receiver},
-    },
-    thread::{self, JoinHandle},
-};
+use std::{io, path::PathBuf};
 
-use crate::{msc::MainServiceChannel, wavefinder::Buffer};
+use tokio::io::AsyncReadExt;
+use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 
-use super::Source;
+use crate::wavefinder::Buffer;
 
-pub struct FileSource {
-    exit: Arc<Mutex<bool>>,
-    path: Option<PathBuf>,
+pub struct FileControl {
+    task: JoinHandle<()>,
 }
 
-pub fn new_file_source(path: Option<PathBuf>) -> Box<dyn Source + Send + Sync> {
-    let exit = Arc::new(Mutex::new(false));
-    Box::new(FileSource { exit, path })
+impl FileControl {
+    pub async fn shutdown(self) {
+        self.task.abort();
+        let _ = self.task.await;
+    }
 }
 
-impl Source for FileSource {
-    fn run(&mut self) -> (Receiver<Buffer>, JoinHandle<()>) {
-        let (source_tx, source_rx) = mpsc::channel();
-        let path = self.path.clone();
-        let exit = self.exit.clone();
-        let source_t = thread::spawn(move || {
-            let mut buf;
-            if let Some(p) = path {
-                let file = File::open(&p);
-                if let Ok(f) = file {
-                    buf = BufReader::new(f);
-                } else {
-                    panic!("file couldn't be opened {:?}", p);
-                }
-            } else {
-                panic!("no file specified");
+pub fn start_file_source(path: Option<PathBuf>) -> (mpsc::Receiver<Buffer>, FileControl) {
+    let (source_tx, source_rx) = mpsc::channel(512);
+
+    let task = tokio::task::spawn_local(async move {
+        let Some(path) = path else {
+            eprintln!("no file specified");
+            let _ = source_tx
+                .send(Buffer {
+                    bytes: [0; 524],
+                    last: true,
+                })
+                .await;
+            return;
+        };
+
+        let mut file = match tokio::fs::File::open(&path).await {
+            Ok(file) => file,
+            Err(error) => {
+                eprintln!("file couldn't be opened {:?}: {}", path, error);
+                let _ = source_tx
+                    .send(Buffer {
+                        bytes: [0; 524],
+                        last: true,
+                    })
+                    .await;
+                return;
             }
+        };
 
-            loop {
-                if let Ok(e) = exit.lock()
-                    && *e
-                {
-                    break;
+        loop {
+            let mut bytes = [0; 524];
+            match file.read_exact(&mut bytes).await {
+                Ok(_) => {
+                    if source_tx.send(Buffer { bytes, last: false }).await.is_err() {
+                        break;
+                    }
                 }
-                let result = Buffer::read_from_file(&mut buf);
-                let Ok(buffer) = result else {
-                    source_tx
+                Err(error) => {
+                    if error.kind() != io::ErrorKind::UnexpectedEof {
+                        eprintln!("error reading {:?}: {}", path, error);
+                    }
+                    let _ = source_tx
                         .send(Buffer {
                             bytes: [0; 524],
                             last: true,
                         })
-                        .unwrap();
+                        .await;
                     break;
-                };
-                source_tx.send(buffer).unwrap();
+                }
             }
-        });
-        (source_rx, source_t)
-    }
-
-    fn select_channel(&mut self, channel: &MainServiceChannel) {
-        dbg!(channel);
-        // no-op for file source
-    }
-
-    fn ready(&self) -> bool {
-        // file source is always ready
-        true
-    }
-
-    fn exit(&mut self) {
-        if let Ok(mut e) = self.exit.lock() {
-            *e = true;
         }
-    }
+    });
+
+    (source_rx, FileControl { task })
 }

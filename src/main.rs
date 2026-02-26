@@ -6,20 +6,20 @@
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::too_many_arguments)]
 
-use std::io;
-use std::sync::mpsc::{Receiver, Sender};
-use std::thread::JoinHandle;
 use std::time::Duration;
 
 use color_eyre::Result;
+use crossterm::event::{Event, EventStream, KeyCode, KeyEvent, KeyEventKind};
 use dab::fic::ensemble::{Ensemble, Service};
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, poll};
+use futures_util::StreamExt;
 use ratatui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::symbols::border;
 use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Cell, Paragraph, Row, Table, TableState};
 use ratatui::{DefaultTerminal, Frame};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::task::JoinHandle;
 
 use clap::Parser;
 use dab::receiver::new_receiver;
@@ -27,67 +27,69 @@ use dab::{Cli, ControlData, ControlEvent, EventData, UiEvent};
 
 struct App {
     exit: bool,
-    control_tx: Sender<ControlEvent>,
-    ui_rx: Receiver<UiEvent>,
+    control_tx: UnboundedSender<ControlEvent>,
+    ui_rx: UnboundedReceiver<UiEvent>,
     ensemble: Option<Ensemble>,
     service: Option<Service>,
     label: Option<String>,
     tablestate: TableState,
 }
 
-fn main() -> Result<()> {
+#[tokio::main(flavor = "current_thread")]
+async fn main() -> Result<()> {
     let args = Cli::parse();
     color_eyre::install()?;
     let terminal = ratatui::init();
 
-    let mut receiver = new_receiver(args);
-    let (ui_rx, control_tx, receiver_t) = receiver.run();
+    let result = tokio::task::LocalSet::new()
+        .run_until(async move {
+            let receiver = new_receiver(args);
+            let runtime = receiver.run();
 
-    let mut app = App {
-        ui_rx,
-        control_tx,
-        ensemble: None,
-        service: None,
-        label: None,
-        exit: false,
-        tablestate: TableState::default().with_selected(0),
-    };
-    let result = app.run(terminal, receiver_t);
+            let mut app = App {
+                ui_rx: runtime.ui_rx,
+                control_tx: runtime.control_tx,
+                ensemble: None,
+                service: None,
+                label: None,
+                exit: false,
+                tablestate: TableState::default().with_selected(0),
+            };
+
+            app.run(terminal, runtime.task).await
+        })
+        .await;
 
     ratatui::restore();
     result
 }
 
 impl App {
-    fn run(&mut self, mut terminal: DefaultTerminal, receiver_t: JoinHandle<()>) -> Result<()> {
+    async fn run(
+        &mut self,
+        mut terminal: DefaultTerminal,
+        receiver_t: JoinHandle<()>,
+    ) -> Result<()> {
+        let mut events = EventStream::new();
+        let mut tick = tokio::time::interval(Duration::from_millis(100));
+
         loop {
             terminal.draw(|frame| self.draw(frame))?;
 
-            if let Ok(events) = poll(Duration::from_millis(100))
-                && events
-            {
-                self.handle_events()?;
-            }
-
-            if let Ok(event) = self.ui_rx.recv_timeout(Duration::from_millis(100)) {
-                match event {
-                    UiEvent {
-                        data: EventData::Ensemble(ensemble),
-                    } => {
-                        self.ensemble = Some(ensemble);
-                    },
-                    UiEvent {
-                        data: EventData::Service(service),
-                    } => {
-                        self.service = Some(service);
-                        self.set_selected_service();
-                    },
-                    UiEvent {
-                        data: EventData::Label(label),
-                    } => {
-                        self.label = Some(label);
+            tokio::select! {
+                maybe_event = events.next() => {
+                    if let Some(Ok(Event::Key(key_event))) = maybe_event
+                        && key_event.kind == KeyEventKind::Press
+                    {
+                        self.handle_key_event(key_event);
                     }
                 }
+                maybe_ui = self.ui_rx.recv() => {
+                    if let Some(event) = maybe_ui {
+                        self.handle_ui_event(event);
+                    }
+                }
+                _ = tick.tick() => {}
             }
 
             if self.exit {
@@ -95,39 +97,54 @@ impl App {
             }
         }
 
-        // todo propagate properly
-        let result = receiver_t.join();
+        let _ = receiver_t.await;
         Ok(())
     }
 
     fn set_selected_service(&mut self) {
-        for (i, s) in self.ensemble.as_ref().unwrap().services().into_iter().enumerate() {
+        for (i, s) in self
+            .ensemble
+            .as_ref()
+            .unwrap()
+            .services()
+            .into_iter()
+            .enumerate()
+        {
             if self.service.as_ref().unwrap().id == s.id {
                 self.tablestate.select(Some(i));
             }
         }
     }
 
-    fn handle_events(&mut self) -> io::Result<()> {
-        match event::read()? {
-            // it's important to check that the event is a key press event as
-            // crossterm also emits key release and repeat events on Windows.
-            Event::Key(key_event) if key_event.kind == KeyEventKind::Press => {
-                self.handle_key_event(key_event)
+    fn handle_ui_event(&mut self, event: UiEvent) {
+        match event {
+            UiEvent {
+                data: EventData::Ensemble(ensemble),
+            } => {
+                self.ensemble = Some(ensemble);
             }
-            _ => {}
-        };
-        Ok(())
+            UiEvent {
+                data: EventData::Service(service),
+            } => {
+                self.service = Some(service);
+                self.set_selected_service();
+            }
+            UiEvent {
+                data: EventData::Label(label),
+            } => {
+                self.label = Some(label);
+            }
+        }
     }
 
     fn handle_key_event(&mut self, key_event: KeyEvent) {
-         match key_event.code {
+        match key_event.code {
             KeyCode::Char('q') | KeyCode::Esc => self.quit(),
             KeyCode::Char('j') | KeyCode::Down => self.next_row(),
             KeyCode::Char('k') | KeyCode::Up => self.previous_row(),
             KeyCode::Enter => self.select_service(),
             _ => (),
-         }
+        }
     }
 
     fn select_service(&mut self) {
@@ -208,7 +225,11 @@ impl App {
 
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(20), Constraint::Percentage(10), Constraint::Percentage(70)])
+            .constraints(vec![
+                Constraint::Percentage(20),
+                Constraint::Percentage(10),
+                Constraint::Percentage(70),
+            ])
             .split(frame.area());
 
         if self.ensemble.is_some() {
@@ -230,14 +251,10 @@ impl App {
         }
 
         if let Some(label) = &self.label {
-            let paragraph = Paragraph::new(
-                Line::from(label.to_string())
-            ).alignment(Alignment::Left);
+            let paragraph =
+                Paragraph::new(Line::from(label.to_string())).alignment(Alignment::Left);
 
-            frame.render_widget(
-                paragraph.block(dls_block),
-                layout[1]
-            )
+            frame.render_widget(paragraph.block(dls_block), layout[1])
         }
     }
 
@@ -278,8 +295,7 @@ impl App {
             .title(bottom_title.centered())
             .border_set(border::THICK);
 
-        let selected_row_style = Style::default()
-            .add_modifier(Modifier::REVERSED);
+        let selected_row_style = Style::default().add_modifier(Modifier::REVERSED);
 
         let table = Table::new(
             rows,

@@ -115,14 +115,13 @@ impl Mpeg {
                 };
                 let rate = match header.id {
                     false => 24000,
-                    true  => 48000,
+                    true => 48000,
                 };
                 self.init(channels, rate);
             }
         }
 
         if self.header_valid {
-
             // Wrap your frame bytes in a Packet
             let packet = Packet::new_from_slice(0, 0, 0, &frame.bits);
 

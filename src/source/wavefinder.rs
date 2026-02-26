@@ -1,170 +1,110 @@
-use std::cell::RefCell;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::PathBuf;
-use std::sync::atomic::AtomicBool;
-use std::sync::mpsc::{self, Receiver};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{self, Sender};
 use std::thread::{self, JoinHandle};
 
-use crate::msc::MainServiceChannel;
-use crate::prs;
-use crate::prs::sync::{PhaseReferenceSynchroniser, new_synchroniser};
+use tokio::sync::mpsc::Receiver;
+
 use crate::wavefinder;
-use crate::wavefinder::{Buffer, Wavefinder};
+use crate::wavefinder::{Buffer, Message, Wavefinder};
 
-use super::Source;
-
-static LOCKED: AtomicBool = AtomicBool::new(false);
-
-pub struct WavefinderSource {
-    exit: Arc<Mutex<bool>>,
-    path: Option<PathBuf>,
-    freq: String,
-    sync: Option<Arc<Mutex<PhaseReferenceSynchroniser>>>,
+enum WavefinderCommand {
+    Stop,
+    UsbMessage(Message),
 }
 
-pub fn new_wavefinder_source(
-    path: Option<PathBuf>,
-    freq: Option<String>,
-) -> Box<dyn Source + Send + Sync> {
-    let exit = Arc::new(Mutex::new(false));
-    Box::new(WavefinderSource {
-        exit,
-        path,
-        freq: freq.unwrap_or("225.648".to_owned()),
-        sync: None,
-    })
+pub struct WavefinderControl {
+    command_tx: Sender<WavefinderCommand>,
+    thread: Option<JoinHandle<()>>,
 }
 
-impl Source for WavefinderSource {
-    fn ready(&self) -> bool {
-        if let Some(sync) = &self.sync
-            && let Ok(s) = sync.lock()
-        {
-            return s.count() == 0;
-        }
-        false
+impl WavefinderControl {
+    pub fn send_message(&self, message: Message) {
+        let _ = self.command_tx.send(WavefinderCommand::UsbMessage(message));
     }
 
-    fn exit(&mut self) {
-        if let Ok(mut e) = self.exit.lock() {
-            *e = true;
+    pub async fn shutdown(mut self) {
+        let _ = self.command_tx.send(WavefinderCommand::Stop);
+        if let Some(thread) = self.thread.take() {
+            let _ = tokio::task::spawn_blocking(move || thread.join()).await;
         }
     }
+}
 
-    fn select_channel(&mut self, channel: &MainServiceChannel) {
-        // dbg!(channel);
+pub fn start_wavefinder_source(
+    path: Option<PathBuf>,
+    frequency: Option<String>,
+) -> (Receiver<Buffer>, WavefinderControl) {
+    let (source_tx, source_rx) = tokio::sync::mpsc::channel(512);
+    let (command_tx, command_rx) = mpsc::channel();
 
-        if let Some(sync) = &self.sync
-            && let Ok(mut s) = sync.lock()
-        {
-            s.select_channel(channel);
-        }
-    }
+    let thread = thread::spawn(move || {
+        let mut wavefinder: Wavefinder = wavefinder::open();
+        let running = Arc::new(AtomicBool::new(true));
+        let running_in_callback = running.clone();
+        let source_tx_in_callback = source_tx;
 
-    fn run(&mut self) -> (Receiver<Buffer>, JoinHandle<()>) {
-        let file_output = self.path.is_some();
-        let path = self.path.clone();
-        let freq = self.freq.clone();
-
-        let sync = Arc::new(Mutex::new(new_synchroniser(&LOCKED)));
-        self.sync = Some(sync.clone());
-
-        let exit = self.exit.clone();
-
-        let (source_tx, source_rx) = mpsc::channel();
-
-        let source_t = thread::spawn(move || {
-            let mut w: Wavefinder = wavefinder::open();
-            let prs = RefCell::new(prs::new_symbol());
-
-            let (message_tx, message_rx) = mpsc::channel();
-            let (prs_tx, prs_rx) = mpsc::channel();
-            let (file_tx, file_rx) = mpsc::channel::<Buffer>();
-
-            let prs_exit = exit.clone();
-
-            thread::spawn(move || {
-                loop {
-                    if let Ok(e) = prs_exit.lock()
-                        && *e
-                    {
-                        break;
-                    }
-
-                    let result = prs_rx.recv();
-                    if let Ok(complete_prs) = result
-                        && let Ok(mut s) = sync.lock()
-                    {
-                        let messages = s.try_sync_prs(complete_prs);
-                        for m in messages {
-                            if message_tx.send(m).is_err() {
-                                break;
-                            }
-                        }
-                    }
-                }
-            });
-
-            if file_output {
-                thread::spawn(move || {
-                    if let Some(p) = path {
-                        let f = File::create(p).expect("Unable to create file");
-                        let mut buf = BufWriter::new(f);
-
-                        loop {
-                            let result = file_rx.recv();
-                            if let Ok(buffer) = result {
-                                buffer.write_to_file(&mut buf);
-                            }
-                        }
-                    }
-                });
-            }
-
-            let cb = move |buffer: Buffer| {
-                // Phase Reference Symbol
-                prs.borrow_mut().try_buffer(&buffer);
-                if prs.borrow_mut().is_complete() {
-                    let p = prs.replace_with(|_| prs::new_symbol());
-                    prs_tx.send(p).unwrap();
-                }
-
-                if LOCKED.load(std::sync::atomic::Ordering::Relaxed) {
-                    source_tx.send(buffer).unwrap();
-
-                    // File writer
-                    if file_output {
-                        file_tx.send(buffer).unwrap();
-                    }
-                }
-            };
-
-            w.set_callback(cb);
-
-            if let Ok(f) = freq.parse::<f64>() {
-                w.init(f); // BBC National DAB
-            } else {
-                panic!("bad frequency: {}", freq);
-            }
-
-            w.read();
-
-            loop {
-                if let Ok(e) = exit.lock()
-                    && *e
-                {
-                    break;
-                }
-
-                w.handle_events();
-                while let Ok(m) = message_rx.try_recv() {
-                    w.send_ctrl_message(&m);
-                }
+        let mut file_output = path.and_then(|path| match File::create(path) {
+            Ok(file) => Some(BufWriter::new(file)),
+            Err(error) => {
+                eprintln!("unable to create output file: {}", error);
+                None
             }
         });
 
-        (source_rx, source_t)
-    }
+        let callback = move |buffer: Buffer| {
+            if source_tx_in_callback.blocking_send(buffer).is_err() {
+                running_in_callback.store(false, Ordering::Relaxed);
+                return;
+            }
+
+            if let Some(file) = file_output.as_mut() {
+                buffer.write_to_file(file);
+            }
+        };
+
+        wavefinder.set_callback(callback);
+
+        match frequency.as_deref().unwrap_or("225.648").parse::<f64>() {
+            Ok(freq) => wavefinder.init(freq),
+            Err(error) => {
+                eprintln!("bad frequency {:?}: {}", frequency, error);
+                running.store(false, Ordering::Relaxed);
+            }
+        }
+
+        if running.load(Ordering::Relaxed) {
+            wavefinder.read();
+        }
+
+        while running.load(Ordering::Relaxed) {
+            while let Ok(command) = command_rx.try_recv() {
+                match command {
+                    WavefinderCommand::Stop => {
+                        running.store(false, Ordering::Relaxed);
+                    }
+                    WavefinderCommand::UsbMessage(message) => {
+                        wavefinder.send_ctrl_message(&message);
+                    }
+                }
+            }
+
+            if !running.load(Ordering::Relaxed) {
+                break;
+            }
+
+            wavefinder.handle_events();
+        }
+    });
+
+    (
+        source_rx,
+        WavefinderControl {
+            command_tx,
+            thread: Some(thread),
+        },
+    )
 }
