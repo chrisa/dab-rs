@@ -24,6 +24,7 @@ crossterm = { version = "0.29.0", features = ["event-stream"] }
 color-eyre = "0.6.5"
 tokio = { version = "1.48.0", features = ["fs", "io-util", "macros", "rt", "sync", "time"] }
 futures-util = "0.3.31"
+dial9-tokio-telemetry = "0.2.0"
 
 [profile.release]
 debug = true

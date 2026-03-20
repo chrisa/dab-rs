@@ -21,6 +21,7 @@ use ratatui::widgets::{Block, Cell, Paragraph, Row, Table, TableState};
 use ratatui::{DefaultTerminal, Frame};
 use tokio::sync::{mpsc::UnboundedSender, watch};
 use tokio::task::JoinHandle;
+use dial9_tokio_telemetry::telemetry::{RotatingWriter, TracedRuntime};
 
 use clap::Parser;
 use dab::receiver::new_receiver;
@@ -36,14 +37,27 @@ struct App {
     tablestate: TableState,
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let args = Cli::parse();
     color_eyre::install()?;
     let terminal = ratatui::init();
 
-    let result = tokio::task::LocalSet::new()
-        .run_until(async move {
+    let writer = RotatingWriter::new(
+        "/tmp/my_traces/trace.bin",
+        20 * 1024 * 1024,   // rotate after 20 MiB
+        100 * 1024 * 1024,  // keep at most 100 MiB on disk
+    )?;
+
+    let mut builder = tokio::runtime::Builder::new_current_thread();
+    builder.enable_all();
+    // builder.worker_threads(4).enable_all();
+
+    let (runtime, _guard) = TracedRuntime::build_and_start(builder, writer)?;
+
+    let _ = runtime.block_on(async {
+
+        let _ = tokio::task::LocalSet::new().run_until(async move {
+
             let receiver = new_receiver(args);
             let runtime = receiver.run();
 
@@ -60,9 +74,10 @@ async fn main() -> Result<()> {
             app.run(terminal, runtime.task).await
         })
         .await;
+    });
 
     ratatui::restore();
-    result
+    Ok(())
 }
 
 impl App {
