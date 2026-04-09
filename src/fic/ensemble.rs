@@ -283,15 +283,15 @@ impl Ensemble {
                             self.add_service(new_service(SId));
                             for component in components {
                                 match component {
-                                    ServiceComponent::StreamAudio { SubChId, PS, .. } => self
+                                    ServiceComponent::StreamAudio(sa) => self
                                         .add_service_subchannel(
                                             SId,
-                                            new_subchannel(SubChId, PS != 0),
+                                            new_subchannel(sa.SubChId, sa.PS != 0),
                                         ),
-                                    ServiceComponent::PacketData { SCId, PS, .. } => self
+                                    ServiceComponent::PacketData(pd) => self
                                         .add_service_data_subchannel(
                                             SId,
-                                            new_data_subchannel(SCId, PS != 0),
+                                            new_data_subchannel(pd.SCId, pd.PS != 0),
                                         ),
                                     _ => {}
                                 }

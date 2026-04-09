@@ -8,7 +8,6 @@ use bitvec::{
     slice::BitSlice,
     view::BitView,
 };
-use rustfft::num_traits::Num;
 use core::fmt::Debug;
 
 #[derive(Debug)]
@@ -77,67 +76,65 @@ pub enum Information {
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
-struct StreamAudio {
+pub struct StreamAudio {
     #[deku(bits = 6)]
-    ASCTy: u8,
+    pub(crate) ASCTy: u8,
     #[deku(bits = 6)]
-    SubChId: u8,
+    pub(crate) SubChId: u8,
     #[deku(bits = 1)]
-    PS: u8,
+    pub(crate) PS: u8,
     #[deku(bits = 1)]
-    CAFlg: u8,
+    pub(crate) CAFlg: u8,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
-struct StreamData {
+pub struct StreamData {
     #[deku(bits = 6)]
-    DSCTy: u8,
+    pub(crate) DSCTy: u8,
     #[deku(bits = 6)]
-    SubChId: u8,
+    pub(crate) SubChId: u8,
     #[deku(bits = 1)]
-    PS: u8,
+    pub(crate) PS: u8,
     #[deku(bits = 1)]
-    CAFlg: u8,
+    pub(crate) CAFlg: u8,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
-struct FIDC {
+pub struct FIDC {
     #[deku(bits = 6)]
-    DSCTy: u8,
+    pub(crate) DSCTy: u8,
     #[deku(bits = 6)]
-    FIDCId: u8,
+    pub(crate) FIDCId: u8,
     #[deku(bits = 1)]
-    PS: u8,
+    pub(crate) PS: u8,
     #[deku(bits = 1)]
-    CAFlg: u8,
+    pub(crate) CAFlg: u8,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
 #[deku(endian = "big")]
-struct PacketData {
+pub struct PacketData {
     #[deku(bits = 12)]
-    SCId: u16,
+    pub(crate) SCId: u16,
     #[deku(bits = 1)]
-    PS: u8,
+    pub(crate) PS: u8,
     #[deku(bits = 1)]
-    CAFlg: u8,
+    pub(crate) CAFlg: u8,
 }
 
 #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8", bits = 2, endian = "big")]
+#[deku(id_type = "u8", bits = 2)]
 pub enum ServiceComponent {
     #[deku(id = 0x00)]
-    StreamAudio,
+    StreamAudio(StreamAudio),
     #[deku(id = 0x01)]
-    StreamData,
+    StreamData(StreamData),
     #[deku(id = 0x02)]
-    FIDC,
+    FIDC(FIDC),
     #[deku(id = 0x03)]
-    PacketData,
-    #[deku(id = 0xff)]
-    Unknown,
+    PacketData(PacketData),
 }
 
 #[derive(Debug)]
