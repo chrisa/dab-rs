@@ -74,68 +74,135 @@ pub enum Information {
     },
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(endian = "big")]
-pub struct StreamAudio {
-    #[deku(bits = 6)]
-    pub(crate) ASCTy: u8,
-    #[deku(bits = 6)]
-    pub(crate) SubChId: u8,
-    #[deku(bits = 1)]
-    pub(crate) PS: u8,
-    #[deku(bits = 1)]
-    pub(crate) CAFlg: u8,
+macro_rules! fig_enum {
+    (
+        $(#[$enum_meta:meta])*
+        pub enum $name:ident : $id_type:literal [ bits = $id_bits:literal ] {
+            $(
+                #[id = $id:literal]
+                $variant:ident {
+                    $( $field:ident : $fty:ty [ bits = $fbits:literal ], )*
+                },
+            )*
+        }
+    ) => {
+        $(
+            #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+            #[deku(endian = "big")]
+            pub struct $variant {
+                $(
+                    #[deku(bits = $fbits)]
+                    pub(crate) $field: $fty,
+                )*
+            }
+        )*
+
+        $(#[$enum_meta])*
+        #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+        #[deku(id_type = $id_type, bits = $id_bits)]
+        pub enum $name {
+            $(
+                #[deku(id = $id)]
+                $variant($variant),
+            )*
+        }
+    };
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(endian = "big")]
-pub struct StreamData {
-    #[deku(bits = 6)]
-    pub(crate) DSCTy: u8,
-    #[deku(bits = 6)]
-    pub(crate) SubChId: u8,
-    #[deku(bits = 1)]
-    pub(crate) PS: u8,
-    #[deku(bits = 1)]
-    pub(crate) CAFlg: u8,
+fig_enum! {
+    pub enum ServiceComponent: "u8" [bits = 2] {
+        #[id = 0x00]
+        StreamAudio {
+            ASCTy: u8 [bits = 6],
+            SubChId: u8 [bits = 6],
+            PS: u8 [bits = 1],
+            CAFlg: u8 [bits = 1],
+        },
+        #[id = 0x01]
+        StreamData {
+            DSCTy: u8 [bits = 6],
+            SubChId: u8 [bits = 6],
+            PS: u8 [bits = 1],
+            CAFlg: u8 [bits = 1],
+        },
+        #[id = 0x02]
+        FIDC {
+            DSCTy: u8 [bits = 6],
+            FIDCId: u8 [bits = 6],
+            PS: u8 [bits = 1],
+            CAFlg: u8 [bits = 1],
+        },
+        #[id = 0x03]
+        PacketData {
+            SCId: u16 [bits = 12],
+            PS: u8 [bits = 1],
+            CAFlg: u8 [bits = 1],
+        },
+    }
 }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(endian = "big")]
-pub struct FIDC {
-    #[deku(bits = 6)]
-    pub(crate) DSCTy: u8,
-    #[deku(bits = 6)]
-    pub(crate) FIDCId: u8,
-    #[deku(bits = 1)]
-    pub(crate) PS: u8,
-    #[deku(bits = 1)]
-    pub(crate) CAFlg: u8,
-}
+// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+// #[deku(endian = "big")]
+// pub struct StreamAudio {
+//     #[deku(bits = 6)]
+//     pub(crate) ASCTy: u8,
+//     #[deku(bits = 6)]
+//     pub(crate) SubChId: u8,
+//     #[deku(bits = 1)]
+//     pub(crate) PS: u8,
+//     #[deku(bits = 1)]
+//     pub(crate) CAFlg: u8,
+// }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(endian = "big")]
-pub struct PacketData {
-    #[deku(bits = 12)]
-    pub(crate) SCId: u16,
-    #[deku(bits = 1)]
-    pub(crate) PS: u8,
-    #[deku(bits = 1)]
-    pub(crate) CAFlg: u8,
-}
+// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+// #[deku(endian = "big")]
+// pub struct StreamData {
+//     #[deku(bits = 6)]
+//     pub(crate) DSCTy: u8,
+//     #[deku(bits = 6)]
+//     pub(crate) SubChId: u8,
+//     #[deku(bits = 1)]
+//     pub(crate) PS: u8,
+//     #[deku(bits = 1)]
+//     pub(crate) CAFlg: u8,
+// }
 
-#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
-#[deku(id_type = "u8", bits = 2)]
-pub enum ServiceComponent {
-    #[deku(id = 0x00)]
-    StreamAudio(StreamAudio),
-    #[deku(id = 0x01)]
-    StreamData(StreamData),
-    #[deku(id = 0x02)]
-    FIDC(FIDC),
-    #[deku(id = 0x03)]
-    PacketData(PacketData),
-}
+// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+// #[deku(endian = "big")]
+// pub struct FIDC {
+//     #[deku(bits = 6)]
+//     pub(crate) DSCTy: u8,
+//     #[deku(bits = 6)]
+//     pub(crate) FIDCId: u8,
+//     #[deku(bits = 1)]
+//     pub(crate) PS: u8,
+//     #[deku(bits = 1)]
+//     pub(crate) CAFlg: u8,
+// }
+
+// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+// #[deku(endian = "big")]
+// pub struct PacketData {
+//     #[deku(bits = 12)]
+//     pub(crate) SCId: u16,
+//     #[deku(bits = 1)]
+//     pub(crate) PS: u8,
+//     #[deku(bits = 1)]
+//     pub(crate) CAFlg: u8,
+// }
+
+// #[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+// #[deku(id_type = "u8", bits = 2)]
+// pub enum ServiceComponent {
+//     #[deku(id = 0x00)]
+//     StreamAudio(StreamAudio),
+//     #[deku(id = 0x01)]
+//     StreamData(StreamData),
+//     #[deku(id = 0x02)]
+//     FIDC(FIDC),
+//     #[deku(id = 0x03)]
+//     PacketData(PacketData),
+// }
 
 #[derive(Debug)]
 pub struct Type1 {
