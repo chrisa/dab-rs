@@ -1,12 +1,14 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
 
+use deku::prelude::*;
 use bitvec::{
     field::BitField,
     order::{Lsb0, Msb0},
     slice::BitSlice,
     view::BitView,
 };
+use rustfft::num_traits::Num;
 use core::fmt::Debug;
 
 #[derive(Debug)]
@@ -73,32 +75,69 @@ pub enum Information {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big")]
+struct StreamAudio {
+    #[deku(bits = 6)]
+    ASCTy: u8,
+    #[deku(bits = 6)]
+    SubChId: u8,
+    #[deku(bits = 1)]
+    PS: u8,
+    #[deku(bits = 1)]
+    CAFlg: u8,
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big")]
+struct StreamData {
+    #[deku(bits = 6)]
+    DSCTy: u8,
+    #[deku(bits = 6)]
+    SubChId: u8,
+    #[deku(bits = 1)]
+    PS: u8,
+    #[deku(bits = 1)]
+    CAFlg: u8,
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big")]
+struct FIDC {
+    #[deku(bits = 6)]
+    DSCTy: u8,
+    #[deku(bits = 6)]
+    FIDCId: u8,
+    #[deku(bits = 1)]
+    PS: u8,
+    #[deku(bits = 1)]
+    CAFlg: u8,
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(endian = "big")]
+struct PacketData {
+    #[deku(bits = 12)]
+    SCId: u16,
+    #[deku(bits = 1)]
+    PS: u8,
+    #[deku(bits = 1)]
+    CAFlg: u8,
+}
+
+#[derive(Debug, PartialEq, DekuRead, DekuWrite)]
+#[deku(id_type = "u8", bits = 2, endian = "big")]
 pub enum ServiceComponent {
+    #[deku(id = 0x00)]
+    StreamAudio,
+    #[deku(id = 0x01)]
+    StreamData,
+    #[deku(id = 0x02)]
+    FIDC,
+    #[deku(id = 0x03)]
+    PacketData,
+    #[deku(id = 0xff)]
     Unknown,
-    StreamAudio {
-        ASCTy: u8,
-        SubChId: u8,
-        PS: u8,
-        CAFlg: u8,
-    },
-    StreamData {
-        DSCTy: u8,
-        SubChId: u8,
-        PS: u8,
-        CAFlg: u8,
-    },
-    FIDC {
-        DSCTy: u8,
-        FIDCId: u8,
-        PS: u8,
-        CAFlg: u8,
-    },
-    PacketData {
-        SCId: u16,
-        PS: u8,
-        CAFlg: u8,
-    },
 }
 
 #[derive(Debug)]
@@ -276,57 +315,20 @@ impl Type0 {
             let CAId: u8 = data[1..4].load_be();
             let NumSCmp: u8 = data[4..8].load_be();
             offset += 1;
+
+            let mut component_data = &bytes[offset..];
             let mut components = vec![];
-            for i in 0..NumSCmp {
-                data = bytes[offset..].view_bits::<Msb0>();
-                let TMId: u8 = data[0..2].load_be();
-                components.push(match TMId {
-                    0 => {
-                        let ASCTy: u8 = data[2..8].load_be();
-                        let SubChId: u8 = data[8..14].load_be();
-                        let PS: u8 = data[14..15].load_be();
-                        let CAFlg: u8 = data[15..16].load_be();
-                        ServiceComponent::StreamAudio {
-                            ASCTy,
-                            SubChId,
-                            PS,
-                            CAFlg,
-                        }
-                    }
-                    1 => {
-                        let DSCTy: u8 = data[2..8].load_be();
-                        let SubChId: u8 = data[8..14].load_be();
-                        let PS: u8 = data[14..15].load_be();
-                        let CAFlg: u8 = data[15..16].load_be();
-                        ServiceComponent::StreamData {
-                            DSCTy,
-                            SubChId,
-                            PS,
-                            CAFlg,
-                        }
-                    }
-                    2 => {
-                        let DSCTy: u8 = data[2..8].load_be();
-                        let FIDCId: u8 = data[8..14].load_be();
-                        let PS: u8 = data[14..15].load_be();
-                        let CAFlg: u8 = data[15..16].load_be();
-                        ServiceComponent::FIDC {
-                            DSCTy,
-                            FIDCId,
-                            PS,
-                            CAFlg,
-                        }
-                    }
-                    3 => {
-                        let SCId: u16 = data[2..14].load_be();
-                        let PS: u8 = data[14..15].load_be();
-                        let CAFlg: u8 = data[15..16].load_be();
-                        ServiceComponent::PacketData { SCId, PS, CAFlg }
-                    }
-                    _ => ServiceComponent::Unknown,
-                });
-                offset += 2;
+            let mut bit_offset = 0;
+
+            while let Ok((_rest, component)) = ServiceComponent::from_bytes((component_data, bit_offset)) {
+                components.push(component);
+                if components.len() == NumSCmp as usize {
+                    break;
+                }
+                component_data = _rest.0;
+                bit_offset = _rest.1;
             }
+
             services.push(Information::Service {
                 SId,
                 PD: pd != 0,

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use super::fig::{Fig, FigType, Information, LabelPurpose, ServiceComponent};
 
-use crate::msc::tables::{UEPTABLE, UepProf};
+use crate::{msc::tables::{UEPTABLE, UepProf}};
 
 #[derive(Clone)]
 pub struct Ensemble {
